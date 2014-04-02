@@ -24,6 +24,9 @@ script?
   (test (concat data-directory "../lisp/"))
 #+end_src
 
+As an example, my Emacs, with more than 5000 lines of init scripts and
+50 external libraries, starts-up in 290 msec.
+
 *** Method 1: Autoload
 
 A practical solution is "autoload"ing libraries that are not required
