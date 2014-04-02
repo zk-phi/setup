@@ -397,5 +397,10 @@ Defined macros are :
 
 ** Customization
 
+Customizable variables are :
+
 - =setup-include-allow-runtime-load=
 - =setup-environ-warning-alist=
+
+NOTE: Make sure that they are set *during compile* (with
+"eval-when-compile")
