@@ -1,0 +1,401 @@
+* setup.el
+
+高速・安全な設定ファイルを書くためのマクロ集
+
+Helper macros to write faster, portable and robust init script
+
+** Improving Performance
+
+Heavily customized Emacs are sometimes said slow to start-up, and
+ad-hoc techniques like =emacsclient= are used as workarounds. But,
+remember, vanilla Emacs, more than 1000 elisps built-in, does not take
+so long time to launch. Doesn't it seem possible to write faster init
+script?
+
+#+begin_src emacs-lisp
+  ;; you can get built-in elisps listed with the following snippet
+  (defun test (dir)
+    (let (res)
+      (dolist (file (directory-files dir t "[^c.]$"))
+        (setq res (if (file-directory-p file)
+                      (nconc (test file) res)
+                    (cons file res))))
+      res))
+  (test (concat data-directory "../lisp/"))
+#+end_src
+
+*** Method 1: Autoload
+
+A practical solution is "autoload"ing libraries that are not required
+to start-up Emacs. For example, the following piece of init script
+
+#+begin_src emacs-lisp
+  (require 'excellent-library)
+
+  (setq excellent-flag t)
+
+  (global-set-key (kbd "C-n") 'excellent-command-1)
+  (global-set-key (kbd "C-p") 'excellent-command-2)
+#+end_src
+
+can be turned into :
+
+#+begin_src emacs-lisp
+  (autoload 'excellent-command-1 "excellent-library")
+  (autoload 'excellent-command-2 "excellent-library")
+
+  ;; modifying keybinds must be done BEFORE loading
+  (global-set-key (kbd "C-n") 'excellent-command-1)
+  (global-set-key (kbd "C-p") 'excellent-command-2)
+
+  ;; setting "excellent-flag" must be done AFTER loading
+  (eval-after-load "excellent-library"
+    '(setq excellent-flag t))
+#+end_src
+
+and loading =excellent-library= is delayed until either
+=excellent-command-1= or =excellent-command-2= is invoked.
+
+"setup.el" provides a macro =setup-lazy= to write the "autoload"ing
+pattern cleanly, like :
+
+#+begin_src emacs-lisp
+  (setup-lazy
+    '(excellent-command-1 excellent-command-2) "excellent-library"
+    :prepare (setup-keybinds nil
+               "C-n" 'excellent-command-1
+               "C-p" 'excellent-command-2)
+    (setq excellent-flag t))
+#+end_src
+
+*** Method 2: Include
+
+Searching for libraries' paths, opening and reading them may take a
+lot of time. A radical but effective solution is including (embedding)
+whole content of libraries into the init script. "setup.el" provides a
+macro =setup-include=, that reads whole contents of the specified
+library *during compile* and replace the macro call itself with it.
+
+For example, consider we have a script "foo.el" as follows :
+
+#+begin_src emacs-lisp
+  ;; "foo.el"
+  (foo)
+  (bar)
+  (baz)
+#+end_src
+
+then, following init script :
+
+#+begin_src emacs-lisp
+  (setup-include "foo"
+    (hoge)
+    (fuga))
+#+end_src
+
+is (basically) equivalent to :
+
+#+begin_src emacs-lisp
+  ;; included from "foo.el"
+  (foo)
+  (bar)
+  (baz)
+
+  (hoge)
+  (fuga)
+#+end_src
+
+which is clearly faster than :
+
+#+begin_src emacs-lisp
+  (require 'foo)
+
+  (hoge)
+  (fuga)
+#+end_src
+
+In fact, =setup-include= does more. It handles =load-history=, and
+executes =eval-after-load= as if the file had actually been loaded,
+but still much faster.
+
+*** Method 3: Compile-time Execution
+
+For more severe tune-up, "setup.el" provides a bunch of macros to
+control compile-time executions. The most basic macro is =!= (or
+=setup-eval= as an alias). It evaluates body *during compile* and
+replace itself with the evaluated value.
+
+For example, the following piece of script :
+
+#+begin_src emacs-lisp
+  (setq foo (! (+ 1 2)))
+#+end_src
+
+is equivalent to :
+
+#+begin_src emacs-lisp
+  (setq foo '3)
+#+end_src
+
+and slightly faster than :
+
+#+begin_src emacs-lisp
+  (setq foo (+ 1 2))
+#+end_src
+
+Here's a more realistic and complex example. Consider that we want to
+write some Operating System specific settings. Then our init script
+may have a snippet like :
+
+#+begin_src emacs-lisp
+  ;; Load OS specific settings
+  (case window-system
+    (w32      (setup-include "./init/init-windows.el"))
+    ((ns mac) (setup-include "./init/init-mac.el"))
+    (x        (setup-include "./init/init-linux.el"))
+    (nil      (setup-include "./init/init-term.el")))
+#+end_src
+
+but, if we know that the init script runs in Mac, then simply
+
+#+begin_src emacs-lisp
+  (setup-include "./init/init-mac.el")
+#+end_src
+
+is faster. "setup.el" provides a macro =!case= (or =setup-case=),
+which is like =case= but the conditional branch is expanded *during
+compile* so that the compiled script can run with no extra
+overheads. This requires you to compile the init script on each
+systems you use, but runs slightly faster on startup.
+
+In addition, =!case= is an anaphoric macro, so that the results of
+test can be refered with =(it)= in body :
+
+#+begin_src emacs-lisp
+  (!case emacs-major-version
+    ((24 23)   (message "Welcome to Emacs!"))
+    (otherwise (error "Emacs version %d is unsupported." (it))))
+#+end_src
+
+=(it)= is also substituted *during compile* thus this makes init
+script no slower.
+
+For compile-time execution, following (anaphoric) macros are also
+provided.
+
+- =!if=
+- =!when=
+- =!unless=
+- =!cond=
+
+** Improving Portability and Robustness
+
+When an error occurs while executing init script, the rest of init
+script is not executed any more and a strange Emacs is born : a hybrid
+of vanilla Emacs and customized Emacs!
+
+Two common causes of this kind of disasters are :
+
+1. library going to be loaded and configured does not exist
+
+2. configuration contains an error(s)
+
+"setup.el" provides several macros to avoid such tragedies.
+
+*** Method 1: Confirm Existence of Libraries
+
+We may avoid errors on loading or configuring libraries, by checking
+existence of libraries. Common snippets for this approach looks like :
+
+#+begin_src emacs-lisp
+  ;; modify keybinds only when "foo.el" exists
+  (when (locate-library "foo")
+    (global-set-key (kbd "C-x f") 'foo-command))
+
+  ;; "load" does not raise error, and body is evaluated
+  ;; only when "bar.el" is successfully loaded
+  (when (load "bar" t)
+    (bar-set-width 150))
+#+end_src
+
+This technique has two major problems : 1. it looks messy and we
+cannot be willing to maintain it 2. =locate-library= is not very fast
+because it searches for the specified library, and thus takes extra
+time to start-up. For example, here's a little bit more complex, but
+possible instance (which we don't want to maintain) :
+
+#+begin_src emacs-lisp
+  ;; -- in init-ace-jump-mode.el
+
+  ;; Add "ace-jump-mode" to the autoload list IF IT EXISTS, and set
+  ;; "ace-jump-mode-end-hook" WHEN IT IS ACTUALLY LOADED.
+  (when (locate-library "ace-jump-mode")
+    (autoload 'ace-jump-word-mode "ace-jump-mode")
+    (eval-after-load "ace-jump-mode"
+      '(add-hook 'ace-jump-mode-end-hook 'recenter)))
+
+  ;; -- in init-key-chord.el
+
+  ;; Load and activate "key-chord-mode" IF IT EXISTS.
+  (when (load "key-chord" t)
+    (key-chord-mode 1))
+
+  ;; -- in init-keybinds.el
+
+  ;; WHEN "key-chord" IS SUCCESSFULLY LOADED AND "ace-jump-mode" EXISTS,
+  ;; add keybinds for "ace-jump-word-mode" via "key-chord".
+  (eval-after-load "key-chord"
+    '(progn
+       ...
+       (when (locate-library "ace-jump-mode")
+         (key-chord-define-global "jl" 'ace-jump-word-mode))
+       ...))
+
+  ;; -- in init-solarized.el
+
+  ;; WHEN "solarized-definitions" EXISTS, load and configure it. In
+  ;; addition, IF "ace-jump-mode" IS SUCCESSFULLY LOADED, do some extra
+  ;; configurations for "ace-jump-mode" via "solarized-definitions".
+  (when (load "solarized-definitions" t)
+    ...
+    (eval-after-load "ace-jump-mode"
+      '(case (frame-parameter nil 'background-mode)
+         (dark (set-face-foreground 'ace-jump-face-foreground
+                                    (! (solarized-find-color 'base3)))
+               (set-face-foreground 'ace-jump-face-background
+                                    (! (solarized-find-color 'base01))))
+         (light (set-face-foreground 'ace-jump-face-foreground
+                                     (! (solarized-find-color 'base03)))
+                (set-face-foreground 'ace-jump-face-background
+                                     (! (solarized-find-color 'base1))))))
+    ...)
+#+end_src
+
+With this piece of script, we basically want to load and configure
+"ace-jump-mode.el" lazily. In addition, if "key-chord" is available,
+add an additional keybind via "key-chord", and similarly if
+"solarized-definition" is available, do some extra configurations for
+"ace-jump-mode" via "solarized-definitions". This script is robust, in
+the sense that it succeeds even when some of "ace-jump-mode",
+"key-chord", "solarized-definition" don't exist.
+
+"setup.el" provides three macros =setup=, =setup-after= and
+=setup-expecting= to write the pattern much more cleanly and
+effectively. Here's the snippet we saw above, rewritten with
+"setup.el". This is much faster and intuitively clean.
+
+#+begin_src emacs-lisp
+  (setup-lazy '(ace-jump-word-mode) "ace-jump-mode"
+    (add-hook 'ace-jump-mode-end-hook 'recenter))
+
+  (setup "key-chord"
+    (key-chord-mode 1))
+
+  (setup-after "key-chord"
+    ...
+    (setup-expecting "ace-jump-mode"
+      (key-chord-define-global "jl" 'ace-jump-word-mode))
+    ...)
+
+  (setup "solarized-definitions"
+    ...
+    (setup-after "ace-jump-mode"
+      (case (frame-parameter nil 'background-mode)
+        (dark (set-face-foreground 'ace-jump-face-foreground
+                                   (! (solarized-find-color 'base3)))
+              (set-face-foreground 'ace-jump-face-background
+                                   (! (solarized-find-color 'base01))))
+        (light (set-face-foreground 'ace-jump-face-foreground
+                                    (! (solarized-find-color 'base03)))
+               (set-face-foreground 'ace-jump-face-background
+                                    (! (solarized-find-color 'base1))))))
+    ...)
+#+end_src
+
+=setup= basically checks is the library exists, and if so, load the
+library and evaluate body. =setup-expecting= is like =setup=, but does
+not load the library. The body of =setup-after= is evaluated when the
+library is successfully loaded. A macro =setup-lazy= introduced above,
+in fact also checks if the library exists.
+
+In addition, it is the important functionality of the macros, that
+checking existence is done *during compile* and makes init scripts no
+slower. With "setup.el", we may write portable and robust init script
+cleanly, which runs without any extra overheads!
+
+*** Method 2: Get Errors Handled during Start-up
+
+To avoid getting evaluation of init script aborted by an error, we may
+handle errors during start-up. Emacs has a built-in macro
+=condition-case= and =ignore-errors= to handle errors, thus we may get
+errors handled by dividing init script into some small blocks and
+wrapping them with the macro.
+
+For example, we may turn following script
+
+#+begin_src emacs-lisp
+  (foo)
+  (bar)
+  ...
+  (hoge)
+  (fuga)
+  ...
+#+end_src
+
+into this :
+
+#+begin_src emacs-lisp
+  (ignore-errors
+    (foo)
+    (bar)
+    ...)
+
+  (ignore-errors
+    (hoge)
+    (fuga)
+    ...)
+#+end_src
+
+to handle errors.
+
+Fortunately, if the init script is written with "setup.el", it is
+already divided into small blocks that are wrapped with one of
+=setup=, =setup-include=, =setup-lazy=, =setup-after= or
+=setup-expecting=. In fact, these macros also have the error handling
+feature. So once you get init scripts written with "setup.el", the
+hybrid Emacs no longer be born without any additional considerations.
+
+** Other Utilities for Init Script
+
+"setup.el" also provides some additional utility macros to write
+efficient init scripts cleanly.
+
+*** =setup-in-idle=
+
+*** =setup-keybinds=
+
+** Installation
+
+Put "setup.el" into load-path, then require and initialize this script
+
+: (require 'setup)
+: (setup-initialize)
+
+at the beginning of your init script.
+
+Macros are all expanded in compile-time, thus requiring this script
+only during compile is also OK. This may slightly improves
+performance, but lacks highlighting for macros.
+
+: (eval-when-compile (require 'setup))
+
+Defined macros are :
+
+- =!=, =!if=, =!when=, =!unless=, =!case=, =!cond=
+- =setup=, =setup-include=, =setup-lazy=, =setup-after=
+- =setup-in-idle=, =setup-keybinds=
+
+** Customization
+
+- =setup-include-allow-runtime-load=
+- =setup-environ-warning-alist=
