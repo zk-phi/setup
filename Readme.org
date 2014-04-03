@@ -59,7 +59,8 @@ and loading =excellent-library= is delayed until either
 =excellent-command-1= or =excellent-command-2= is invoked.
 
 "setup.el" provides a macro =setup-lazy= to write the "autoload"ing
-pattern cleanly, like :
+pattern cleanly (in fact the macro does some more things described
+later), like :
 
 #+begin_src emacs-lisp
   (setup-lazy
