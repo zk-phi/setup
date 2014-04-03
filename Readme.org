@@ -6,11 +6,10 @@ Helper macros to write faster, portable and robust init script
 
 ** Improving Performance
 
-Heavily customized Emacs are sometimes said slow to start-up, and
-ad-hoc techniques like =emacsclient= are used as workarounds. But,
+Heavily customized Emacs are sometimes said slow to start-up. But,
 remember, vanilla Emacs, more than 1000 elisps built-in, does not take
-so long time to launch. Doesn't it seem possible to write faster init
-script?
+so long time to launch (without =emacsclient=). Doesn't it seem
+possible to write faster init script?
 
 #+begin_src emacs-lisp
   ;; you can get built-in elisps listed with the following snippet
@@ -111,7 +110,7 @@ is (basically) equivalent to :
 which is clearly faster than :
 
 #+begin_src emacs-lisp
-  (require 'foo)
+  (load "foo")
 
   (hoge)
   (fuga)
@@ -384,7 +383,8 @@ Put "setup.el" into load-path, then require and initialize this script
 : (require 'setup)
 : (setup-initialize)
 
-at the beginning of your init script.
+at the beginning of your init script. And compile it by "M-x
+byte-compile-file".
 
 Macros are all expanded in compile-time, thus requiring this script
 only during compile is also OK. This may slightly improves
