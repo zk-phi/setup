@@ -169,7 +169,7 @@ PUT THIS MACRO AT THE BEGINNING OF YOUR INIT SCRIPT."
   "Load FILE. Iff succeeded, eval BODY."
   (declare (indent defun))
   (let ((absfile (locate-library file)))
-    (if (not (file-exists-p absfile))
+    (if (not (and absfile (file-exists-p absfile)))
         (progn (byte-compile-warn "%s not found" file)
                `(message "XX [init] %s: not found" ,file))
       (let* ((feature (intern file))
@@ -208,7 +208,7 @@ loading it in runtime. \"eval-after-load\" works correctly."
         (srcfile (or (ignore-errors (find-library-name file))
                      (expand-file-name file)))
         (libfile (locate-library file)))
-    (if (not (file-exists-p srcfile))
+    (if (not (and srcfile (file-exists-p srcfile)))
         ;; => source file is not available
         (if (and libfile
                  (if (eq setup-include-allow-runtime-load 'undef)
@@ -283,6 +283,13 @@ loading it in runtime. \"eval-after-load\" works correctly."
   "Eval BODY only when FILE exists."
   (declare (indent defun))
   (when (locate-library file)
+    `(condition-case err (progn ,@body)
+       (error (message "XX [init] %s: %s" ,file (error-message-string err))))))
+
+(defmacro setup-alternative (file &rest body)
+  "Eval BODY unless FILE exists."
+  (declare (indent defun))
+  (unless (locate-library file)
     `(condition-case err (progn ,@body)
        (error (message "XX [init] %s: %s" ,file (error-message-string err))))))
 
