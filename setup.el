@@ -32,9 +32,9 @@
 ;;
 ;; at the beginning of your init script. Then you can use following macros :
 ;;
-;; setup-eval, setup-if, setup-when, setup-unless, setup-case,
-;; setup-cond setup, setup-include, setup-lazy, setup-after,
-;; setup-expecting, setup-in-idle setup-keybinds
+;;   setup-eval, setup-if, setup-when, setup-unless, setup-case,
+;;   setup-cond setup, setup-include, setup-lazy, setup-after,
+;;   setup-expecting, setup-in-idle, setup-keybinds, setup-hook
 
 ;; For more informations, see "Readme".
 
@@ -282,9 +282,14 @@ loading it in runtime. \"eval-after-load\" works correctly."
 (defmacro setup-expecting (file &rest body)
   "Eval BODY only when FILE exists."
   (declare (indent defun))
-  (when (locate-library file)
-    `(condition-case err (progn ,@body)
-       (error (message "XX [init] %s: %s" ,file (error-message-string err))))))
+  (cond ((locate-library file)
+         (when (eq (car body) :fallback)
+           (setq body (cddr body)))
+         `(condition-case err (progn ,@body)
+            (error (message "XX [init] %s: %s" ,file (error-message-string err)))))
+        ((eq (car body) :fallback)
+         `(condition-case err ,(cadr body)
+            (error (message "XX [init] %s" (error-message-string err)))))))
 
 (defmacro setup-in-idle (file)
   "Load FILE in idle-time."
