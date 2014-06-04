@@ -377,6 +377,8 @@ efficient init scripts cleanly.
 
 *** =setup-keybinds=
 
+*** =setup-hook=
+
 ** Installation
 
 Put "setup.el" into load-path, then require and initialize this script
