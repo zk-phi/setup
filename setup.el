@@ -82,29 +82,16 @@ when the value differes.")
 
 ;; + internal fns, vars
 
-(defmacro setup--eval-when-compile (&rest body)
-  "Eval BODY when compile on macroexpand."
-  `(when byte-compile-current-file ,@body))
-
 (defvar setup--lazy-load-list nil)
-
-(defvar setup--warning-list nil)
-(defmacro setup--warn-not-found (file)
-  "Returns an S-expression which warns that FILE is not existing."
-  (unless (member file setup--warning-list)
-    (push file setup--warning-list)
-    (byte-compile-warn "%s not found" file)
-    `(message "XX [init] %s: not found" ,file)))
 
 ;; + initialize
 
 (defmacro setup-initialize ()
-  "This macro is replaced with an initializing expression during compile.
-PUT THIS MACRO AT THE BEGINNING OF YOUR INIT SCRIPT."
+  "This macro is replaced with an initializing routine during compile.
+PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
   ;; initialize internal vars before starting compilation
-  (setup--eval-when-compile
-   (setq setup--lazy-load-list nil
-         setup--warning-list   nil))
+  (when byte-compile-current-file
+    (setq setup--lazy-load-list nil))
   `(progn
      ;; check and warn about environ
      (unless (and ,@(mapcar (lambda (pair)
@@ -182,12 +169,14 @@ PUT THIS MACRO AT THE BEGINNING OF YOUR INIT SCRIPT."
   "Load FILE. Iff succeeded, eval BODY."
   (declare (indent defun))
   (let ((feature (intern file))
-        (libfile (locate-library file)))
+        (libfile (or (locate-library file)
+                     (expand-file-name file))))
     (cond ((and libfile (file-exists-p libfile))
            (let ((load-expr (if (featurep feature)
                                 `(require ',feature nil t)
                               `(load ,libfile t t)))
                  (beg-time (cl-gensym)))
+             ;; load also during compile to avoid warnings
              (eval load-expr)
              `(let ((,beg-time (current-time)))
                 ,load-expr
@@ -199,15 +188,16 @@ PUT THIS MACRO AT THE BEGINNING OF YOUR INIT SCRIPT."
                                          (/ (- (nth 2 now) (nth 2 ,beg-time)) 1000)))))
                   (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))
           (t
-           (setup--warn-not-found file)))))
+           (byte-compile-warn "%s not found" file)
+           nil))))
 
 (defun setup--read-all (stream)
   (condition-case nil
       (cons (read stream) (setup--read-all stream))
     (error nil)))
 (defmacro setup-include (file &rest body)
-  "Like \"setup\", but inserts the file source there instead of
-loading it in runtime. \"eval-after-load\" works correctly."
+  "Like \"setup\", but inserts the library source there instead
+of loading it during runtime."
   (declare (indent 1))
   (let ((feature (intern file))         ; string->symbol
         (libfile (locate-library file))
@@ -215,7 +205,9 @@ loading it in runtime. \"eval-after-load\" works correctly."
                      (expand-file-name file))))
     (cond ((and srcfile (file-exists-p srcfile))
            (if (featurep feature) (require feature) (load libfile))
-           (let ((history (assoc libfile load-history))
+           (let ((history
+                  ;; capture what we should put into "load-history"
+                  (assoc libfile load-history))
                  (source (with-temp-buffer
                            (insert-file-contents srcfile)
                            (setup--read-all (current-buffer))))
@@ -223,9 +215,10 @@ loading it in runtime. \"eval-after-load\" works correctly."
              `(let ((,beg-time (current-time)))
                 (unless (assoc ,libfile load-history)
                   (with-no-warnings
-                    ;; to suppress warnings on compilation,
-                    ;; macroexpand source (without warnings) before
-                    ;; starting compilation
+                    ;; To suppress warnings, macroexpand source with
+                    ;; no warnings before starting compilation.  (The
+                    ;; author of .emacs considered not responsible for
+                    ;; the warnings in included libraries)
                     ,@(cdr (with-no-warnings
                              (macroexpand-all (cons 'progn source)))))
                   (push ',history load-history)
@@ -242,31 +235,37 @@ loading it in runtime. \"eval-after-load\" works correctly."
                     (if (eq setup-include-allow-runtime-load 'undef)
                         (setq setup-include-allow-runtime-load
                               (y-or-n-p (concat "Some libraries are not includable."
-                                                " Load them in runtime ?")))
+                                                " Load them during runtime ?")))
                       setup-include-allow-runtime-load)))
            `(setup ,file ,@body))
           (t
-           (setup--warn-not-found file)))))
+           (byte-compile-warn "%s not found" file)
+           nil))))
 
 ;; + autoload libraries
 
 (defmacro setup-lazy (triggers file &rest body)
   "Load FILE on TRIGGERS. When loaded, eval BODY."
   (declare (indent defun))
-  (if (not (locate-library file))
-      (setup--warn-not-found file)
-    (let ((prepare (when (and body (eq (car body) :prepare))
-                     (prog1 (cadr body) (setq body (cddr body))))))
-      `(progn
-         (dolist (trigger ,triggers) (autoload trigger ,file nil t))
-         ,(when prepare
-            `(condition-case err ,prepare
-               (error (message "XX [init] %s: %s" ,file (error-message-string err)))))
-         (eval-after-load ,file
-           ',(macroexpand-all
-              `(condition-case err
-                   (progn ,@body (message "<< [init] %s: loaded" ,file))
-                 (error (message "XX [init] %s: %s" ,file (error-message-string err))))))))))
+  (cond ((not (locate-library file))
+         (byte-compile-warn "%s not found" file)
+         nil)
+        (t
+         (let ((prepare (when (and body (eq (car body) :prepare))
+                          (prog1 (cadr body) (setq body (cddr body))))))
+           `(progn
+              (dolist (trigger ,triggers)
+                (autoload trigger ,file nil t))
+              ,(when prepare
+                 `(condition-case err
+                      ,prepare
+                    (error (message "XX [init] %s: %s" ,file (error-message-string err)))))
+              (eval-after-load ,file
+                ',(macroexpand-all
+                   `(condition-case err
+                        (progn ,@body
+                               (message "<< [init] %s: loaded" ,file))
+                      (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))))))
 
 ;; + pre/post-load evaluation
 
@@ -301,7 +300,7 @@ loading it in runtime. \"eval-after-load\" works correctly."
                         `(load ,libfile t t))))
       `(run-with-idle-timer 15 nil (lambda () ,load-expr)))))
 
-;; + other setup utilities
+;; + other utilities
 
 (defun setup--list->tuples (lst)
   (when lst (cons (cons (car lst) (cadr lst)) (setup--list->tuples (cddr lst)))))
