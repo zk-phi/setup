@@ -90,7 +90,8 @@ when the value differes.")
   "This macro is replaced with an initializing routine during compile.
 PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
   ;; initialize internal vars before starting compilation
-  (when byte-compile-current-file
+  (when (and (boundp 'byte-compile-current-file)
+             byte-compile-current-file)
     (setq setup--lazy-load-list nil))
   `(progn
      ;; check and warn about environ
@@ -231,7 +232,8 @@ of loading it during runtime."
                                          (/ (- (nth 2 now) (nth 2 ,beg-time)) 1000)))))
                   (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))
           ((and libfile
-                (or (not byte-compile-current-file)
+                (or (not (and (boundp 'byte-compile-current-file)
+                              byte-compile-current-file))
                     (if (eq setup-include-allow-runtime-load 'undef)
                         (setq setup-include-allow-runtime-load
                               (y-or-n-p (concat "Some libraries are not includable."
