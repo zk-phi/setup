@@ -75,7 +75,7 @@ when the value differes.")
 (eval-after-load "lisp-mode"
   '(font-lock-add-keywords
     'emacs-lisp-mode
-    '(("(\\(setup\\(?:-\\(?:in\\(?:clude\\|-idle\\)\\|after\\|expecting\\|lazy\\|hook\\)\\)?\\)\\_>"
+    '(("(\\(setup\\(?:-\\(?:in\\(?:clude\\|-idle\\)\\|after\\|expecting\\|lazy\\)\\)?\\)\\_>"
        1 font-lock-keyword-face)
       ("(\\(!\\(?:when\\_>\\|if\\_>\\|unless\\_>\\|cond\\_>\\|case\\_>\\|[^\s\t\n]\\)?\\)"
        1 font-lock-keyword-face))))
