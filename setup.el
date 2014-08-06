@@ -310,8 +310,8 @@ of loading it during runtime."
   "Add BINDS to KEYMAP. BINDS must be a list of (KEYS DEF KEYS
 DEF ...) where KEYS can be one of a string accepted by \"kbd\",
 an event accepted by \"define-key\", or a list of above, and
-COMMAND can be an object that \"define-key\" accepts or a list in
-form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
+COMMAND can be an object that \"define-key\" accepts or a list of
+the form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
   (declare (indent 1))
   (let ((kmap (cl-gensym)))
     `(let ((,kmap (or ,keymap (current-global-map))))
@@ -327,7 +327,7 @@ form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
                                         (setq absfile (locate-library (car def)))
                                         (file-exists-p absfile))
                                    (let ((command (cadr def)))
-                                     `(progn (setup-lazy '(,command) ,file) ',command)))
+                                     `(progn (setup-expecting ,file) ',command)))
                                   (t
                                    `(quote ,(or (nth 2 def) 'ignore))))))
               (cond
