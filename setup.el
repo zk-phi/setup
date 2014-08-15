@@ -80,19 +80,11 @@ when the value differes.")
       ("(\\(!\\(?:when\\_>\\|if\\_>\\|unless\\_>\\|cond\\_>\\|case\\_>\\|[^\s\t\n]\\)?\\)"
        1 font-lock-keyword-face))))
 
-;; + internal fns, vars
-
-(defvar setup--lazy-load-list nil)
-
 ;; + initialize
 
 (defmacro setup-initialize ()
   "This macro is replaced with an initializing routine during compile.
 PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
-  ;; initialize internal vars before starting compilation
-  (when (and (boundp 'byte-compile-current-file)
-             byte-compile-current-file)
-    (setq setup--lazy-load-list nil))
   `(progn
      ;; check and warn about environ
      (unless (and ,@(mapcar (lambda (pair)
@@ -347,19 +339,28 @@ the form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
   (interactive)
   (let* ((absfile (expand-file-name buffer-file-name))
          (dir (file-name-directory absfile))
-         (file (file-name-nondirectory absfile)))
-    (shell-command
-     (if (not window-system)
+         (file (file-name-nondirectory absfile))
+         (tmpfile (make-temp-file "setup")))
+    (if (not window-system)
+        (shell-command
          (format "emacs --batch -eval \"(byte-compile-file \\\"%s\\\")\""
-                 (read-file-name "File: " dir nil t file))
-       (format "emacs -q -eval \"
-(progn (byte-compile-file \\\"%s\\\")
-       (switch-to-buffer \\\"*Compile-Log*\\\")
-       (unless (save-excursion
-                 (or (search-forward \\\"Warning\\\" nil t)
-                     (search-forward \\\"Error\\\" nil t)))
-         (kill-emacs)))\""
-               (read-file-name "File: " dir nil t file))))))
+                 (read-file-name "File: " dir nil t file)))
+      (unless (zerop (shell-command
+                      (print
+                       (format "emacs -q -eval \"
+ (if (byte-compile-file \\\"%s\\\")
+     (kill-emacs 0)
+   (switch-to-buffer \\\"*Compile-Log*\\\")
+   (write-region 1 (1+ (buffer-size)) \\\"%s\\\")
+   (kill-emacs 1))\""
+                               (read-file-name "File: " dir nil t file)
+                               tmpfile))))
+        (with-current-buffer (get-buffer-create "*Compile-Log*")
+          (compilation-mode)
+          (let ((buffer-read-only nil))
+            (insert-file-contents tmpfile))
+          (display-buffer (current-buffer))))
+      (delete-file tmpfile))))
 
 ;; + (provide)
 
