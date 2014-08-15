@@ -346,15 +346,14 @@ the form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
          (format "emacs --batch -eval \"(byte-compile-file \\\"%s\\\")\""
                  (read-file-name "File: " dir nil t file)))
       (unless (zerop (shell-command
-                      (print
-                       (format "emacs -q -eval \"
+                      (format "emacs -q -eval \"
  (if (byte-compile-file \\\"%s\\\")
      (kill-emacs 0)
    (switch-to-buffer \\\"*Compile-Log*\\\")
    (write-region 1 (1+ (buffer-size)) \\\"%s\\\")
    (kill-emacs 1))\""
-                               (read-file-name "File: " dir nil t file)
-                               tmpfile))))
+                              (read-file-name "File: " dir nil t file)
+                              tmpfile)))
         (with-current-buffer (get-buffer-create "*Compile-Log*")
           (compilation-mode)
           (let ((buffer-read-only nil))
