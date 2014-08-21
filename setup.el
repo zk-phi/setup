@@ -337,6 +337,10 @@ the form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
 
 (defun setup-byte-compile-file ()
   (interactive)
+  (when (and (buffer-modified-p)
+             (y-or-n-p (format "Save buffer %s first ? "
+                               (file-name-nondirectory buffer-file-name))))
+    (save-buffer))
   (let* ((absfile (expand-file-name buffer-file-name))
          (dir (file-name-directory absfile))
          (file (file-name-nondirectory absfile))
@@ -345,21 +349,28 @@ the form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
         (shell-command
          (format "emacs --batch -eval \"(byte-compile-file \\\"%s\\\")\""
                  (read-file-name "File: " dir nil t file)))
-      (unless (zerop (shell-command
-                      (format "emacs -q -eval \"
- (if (byte-compile-file \\\"%s\\\")
-     (kill-emacs 0)
+      (let ((returncode (shell-command
+                         (format "emacs -q -eval \"
+ (progn
+   (byte-compile-file \\\"%s\\\")
    (switch-to-buffer \\\"*Compile-Log*\\\")
    (write-region 1 (1+ (buffer-size)) \\\"%s\\\")
-   (kill-emacs 1))\""
-                              (read-file-name "File: " dir nil t file)
-                              tmpfile)))
+   (kill-emacs
+     (if (string-match
+           (regexp-opt '(\\\"error:\\\" \\\"warning:\\\"))
+           (buffer-string))
+         1
+       0)))\""
+                                 (read-file-name "File: " dir nil t file)
+                                 tmpfile))))
         (with-current-buffer (get-buffer-create "*Compile-Log*")
           (compilation-mode)
           (let ((buffer-read-only nil))
             (insert-file-contents tmpfile))
-          (display-buffer (current-buffer))))
-      (delete-file tmpfile))))
+          (delete-file tmpfile)
+          (goto-char (point-max)))
+        (unless (zerop returncode)
+          (display-buffer "*Compile-Log*"))))))
 
 ;; + (provide)
 
