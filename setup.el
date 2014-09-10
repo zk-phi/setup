@@ -45,7 +45,6 @@
 
 ;;; Code:
 
-(require 'cl-lib)
 (require 'find-func)
 (require 'macroexp)
 
@@ -168,7 +167,7 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
            (let ((load-expr (if (featurep feature)
                                 `(require ',feature nil t)
                               `(load ,libfile t t)))
-                 (beg-time (cl-gensym)))
+                 (beg-time (make-symbol "")))
              ;; load also during compile to avoid warnings
              (eval load-expr)
              `(let ((,beg-time (current-time)))
@@ -204,7 +203,7 @@ of loading it during runtime."
                  (source (with-temp-buffer
                            (insert-file-contents srcfile)
                            (setup--read-all (current-buffer))))
-                 (beg-time (cl-gensym)))
+                 (beg-time (make-symbol "")))
              `(let ((,beg-time (current-time)))
                 (unless (assoc ,libfile load-history)
                   (with-no-warnings
@@ -305,7 +304,7 @@ an event accepted by \"define-key\", or a list of above, and
 COMMAND can be an object that \"define-key\" accepts or a list of
 the form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
   (declare (indent 1))
-  (let ((kmap (cl-gensym)))
+  (let ((kmap (make-symbol "")))
     `(let ((,kmap (or ,keymap (current-global-map))))
        ,@(mapcar
           (lambda (bind)
@@ -335,20 +334,22 @@ the form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
   (declare (indent 1))
   `(add-hook ,hook (lambda () ,@exprs)))
 
-(defun setup-byte-compile-file ()
+(defun setup-byte-compile-file (&optional file)
   (interactive)
   (when (and (buffer-modified-p)
              (y-or-n-p (format "Save buffer %s first ? "
                                (file-name-nondirectory buffer-file-name))))
     (save-buffer))
-  (let* ((absfile (expand-file-name buffer-file-name))
-         (dir (file-name-directory absfile))
-         (file (file-name-nondirectory absfile))
-         (tmpfile (make-temp-file "setup")))
+  (let ((tmpfile (make-temp-file "setup"))
+        (filename (or file
+                      (let* ((absfile (expand-file-name buffer-file-name))
+                             (dir (file-name-directory absfile))
+                             (file (file-name-nondirectory absfile)))
+                        (read-file-name "File: " dir nil t file)))))
     (if (not window-system)
         (shell-command
          (format "emacs --batch -eval \"(byte-compile-file \\\"%s\\\")\""
-                 (read-file-name "File: " dir nil t file)))
+                 filename))
       (let ((returncode (shell-command
                          (format "emacs -q -eval \"
  (progn
@@ -361,8 +362,7 @@ the form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
            (buffer-string))
          1
        0)))\""
-                                 (read-file-name "File: " dir nil t file)
-                                 tmpfile))))
+                                 filename tmpfile))))
         (with-current-buffer (get-buffer-create "*Compile-Log*")
           (compilation-mode)
           (let ((buffer-read-only nil))
