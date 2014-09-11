@@ -76,7 +76,7 @@ when the value differes.")
     'emacs-lisp-mode
     '(("(\\(setup\\(?:-\\(?:in\\(?:clude\\|-idle\\)\\|after\\|expecting\\|lazy\\)\\)?\\)\\_>"
        1 font-lock-keyword-face)
-      ("(\\(!\\(?:when\\_>\\|if\\_>\\|unless\\_>\\|cond\\_>\\|case\\_>\\|[^\s\t\n]\\)?\\)"
+      ("(\\(!\\(?:foreach\\_>\\|when\\_>\\|if\\_>\\|unless\\_>\\|cond\\_>\\|case\\_>\\|[^\s\t\n]\\)?\\)"
        1 font-lock-keyword-face))))
 
 ;; + initialize
@@ -86,13 +86,13 @@ when the value differes.")
 PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
   `(progn
      ;; setup stopwatch
-     (let ((beg-time (current-time)))
-       (add-hook 'after-init-hook
-                 `(lambda  ()
-                    (message ">> [init] TOTAL: %d msec"
-                             (let ((now (current-time)))
-                               (+ (* (- (nth 1 now) ,(nth 1 beg-time)) 1000)
-                                  (/ (- (nth 2 now) ,(nth 2 beg-time)) 1000)))))))
+     (defvar setup-start-time (current-time))
+     (add-hook 'after-init-hook
+               (lambda  ()
+                 (message ">> [init] TOTAL: %d msec"
+                          (let ((now (current-time)))
+                            (+ (* (- (nth 1 now) (nth 1 setup-start-time)) 1000)
+                               (/ (- (nth 2 now) (nth 2 setup-start-time)) 1000))))))
      ;; check and warn about environ
      (unless (and ,@(mapcar (lambda (pair)
                               `(or (equal ',(eval (car pair)) ,(car pair))
@@ -111,19 +111,19 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
   "Like \"if\" but anaphoric and expanded during compile."
   (declare (indent 2))
   (setq test (eval test))
-  (macroexpand-all (if test then `(progn ,@else)) `((it . (lambda () ,test)))))
+  (macroexpand-all (if test then `(progn ,@else)) `((it . (lambda () '',test)))))
 
 (defmacro setup-when (test &rest body)
   "Like \"when\" but anaphoric and expanded during compile."
   (declare (indent 1))
   (setq test (eval test))
-  (macroexpand-all (when test `(progn ,@body)) `((it . (lambda () ,test)))))
+  (macroexpand-all (when test `(progn ,@body)) `((it . (lambda () '',test)))))
 
 (defmacro setup-unless (test &rest body)
   "Like \"unless\" but anaphoric and expanded during compile."
   (declare (indent 1))
   (setq test (eval test))
-  (macroexpand-all (unless test `(progn ,@body)) `((it . (lambda () ,test)))))
+  (macroexpand-all (unless test `(progn ,@body)) `((it . (lambda () '',test)))))
 
 (defmacro setup-cond (&rest clauses)
   "Like \"cond\" but anaphoric and expanded during compile."
@@ -131,7 +131,7 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
     (while (and clauses
                 (not (setq val (eval (caar clauses)))))
       (setq clauses (cdr clauses)))
-    (macroexpand-all `(progn ,@(cdar clauses)) `((it . (lambda () ,val))))))
+    (macroexpand-all `(progn ,@(cdar clauses)) `((it . (lambda () '',val))))))
 
 (defmacro setup-case (expr &rest clauses)
   "Like \"case\" but anaphoric and expanded during compile."
@@ -146,7 +146,15 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
                      (not (and (atom keylist)
                                (eql expr keylist))))))
     (setq clauses (cdr clauses)))
-  (macroexpand-all `(progn ,@(cdar clauses)) `((it . (lambda () ,expr)))))
+  (macroexpand-all `(progn ,@(cdar clauses)) `((it . (lambda () '',expr)))))
+
+(defmacro setup-foreach (list &rest body)
+  "Eval BODY for each elements in LIST. The current element can
+  be referred with \"(it)\"."
+  (declare (indent 1))
+  `(progn ,@(mapcar (lambda (elem)
+                      (macroexpand-all `(progn ,@body) `((it . (lambda () '',elem)))))
+                    (eval list))))
 
 (defalias '! 'setup-eval)
 (defalias '!if 'setup-if)
@@ -154,6 +162,7 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
 (defalias '!cond 'setup-cond)
 (defalias '!case 'setup-case)
 (defalias '!unless 'setup-unless)
+(defalias '!foreach 'setup-foreach)
 
 ;; + load and configure libraries
 
@@ -240,12 +249,13 @@ of loading it during runtime."
   "Load FILE on TRIGGERS. When loaded, eval BODY."
   (declare (indent defun))
   (cond ((locate-library file)
-         (let ((preparation (when (and body (eq (car body) :prepare))
+         (let ((triggers (eval triggers))
+               (preparation (when (and body (eq (car body) :prepare))
                               (prog1 (cadr body) (setq body (cddr body))))))
            `(progn
-              (mapc (lambda (trigger)
-                      (autoload trigger ,file nil t))
-                    ,triggers)
+              ,@(mapcar (lambda (trigger)
+                          `(autoload ',trigger ,file nil t))
+                        triggers)
               ,(when preparation
                  `(condition-case err
                       ,preparation
