@@ -48,7 +48,7 @@
 (require 'find-func)
 (require 'macroexp)
 
-(defconst setup-version "1.0.0")
+(defconst setup-version "1.0.1")
 
 ;; + customizable vars
 
@@ -85,13 +85,6 @@ when the value differes.")
   "This macro is replaced with an initializing routine during compile.
 PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
   `(progn
-     ;; check and warn about environ
-     (unless (and ,@(mapcar (lambda (pair)
-                              `(or (equal ',(eval (car pair)) ,(car pair))
-                                   (y-or-n-p
-                                    ,(concat (cdr pair) " Really continue ? "))))
-                            setup-environ-warning-alist))
-       (error "Setup canceled."))
      ;; setup stopwatch
      (let ((beg-time (current-time)))
        (add-hook 'after-init-hook
@@ -99,13 +92,20 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
                     (message ">> [init] TOTAL: %d msec"
                              (let ((now (current-time)))
                                (+ (* (- (nth 1 now) ,(nth 1 beg-time)) 1000)
-                                  (/ (- (nth 2 now) ,(nth 2 beg-time)) 1000)))))))))
+                                  (/ (- (nth 2 now) ,(nth 2 beg-time)) 1000)))))))
+     ;; check and warn about environ
+     (unless (and ,@(mapcar (lambda (pair)
+                              `(or (equal ',(eval (car pair)) ,(car pair))
+                                   (y-or-n-p
+                                    ,(concat (cdr pair) " Really continue ? "))))
+                            setup-environ-warning-alist))
+       (error "Setup canceled."))))
 
 ;; + compile-time execution
 
 (defmacro setup-eval (sexp)
   "Eval during compile."
-  `(quote ,(eval sexp)))
+  `',(eval sexp))
 
 (defmacro setup-if (test then &rest else)
   "Like \"if\" but anaphoric and expanded during compile."
@@ -161,24 +161,24 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
   "Load FILE. Iff succeeded, eval BODY."
   (declare (indent defun))
   (let ((feature (intern file))
-        (libfile (or (locate-library file)
-                     (expand-file-name file))))
-    (cond ((and libfile (file-exists-p libfile))
-           (let ((load-expr (if (featurep feature)
-                                `(require ',feature nil t)
-                              `(load ,libfile t t)))
-                 (beg-time (make-symbol "")))
-             ;; load also during compile to avoid warnings
-             (eval load-expr)
-             `(let ((,beg-time (current-time)))
-                ,load-expr
-                (condition-case err
-                    (progn ,@body
-                           (message ">> [init] %s: succeeded in %d msec" ,file
-                                    (let ((now (current-time)))
-                                      (+ (* (- (nth 1 now) (nth 1 ,beg-time)) 1000)
-                                         (/ (- (nth 2 now) (nth 2 ,beg-time)) 1000)))))
-                  (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))
+        (libfile (locate-library file)))
+    (cond (libfile
+           ;; load during compile
+           (when (and (boundp 'byte-compile-current-file)
+                      byte-compile-current-file)
+             (or (require feature nil t) (load libfile t t)))
+           `(let ((beg-time (current-time)))
+              ,(if (featurep feature)
+                   `(unless (featurep ',feature)
+                      (load ,libfile t t))
+                 `(load ,libfile t t))
+              (condition-case err
+                  (progn ,@body
+                         (message ">> [init] %s: succeeded in %d msec" ,file
+                                  (let ((now (current-time)))
+                                    (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
+                                       (/ (- (nth 2 now) (nth 2 beg-time)) 1000)))))
+                (error (message "XX [init] %s: %s" ,file (error-message-string err))))))
           (t
            (byte-compile-warn "%s not found" file)
            nil))))
@@ -196,40 +196,39 @@ of loading it during runtime."
         (srcfile (or (ignore-errors (find-library-name file))
                      (expand-file-name file))))
     (cond ((and srcfile (file-exists-p srcfile))
-           (if (featurep feature) (require feature) (load libfile))
-           (let ((history
-                  ;; capture what we should put into "load-history"
-                  (assoc libfile load-history))
+           ;; load during compile
+           (when (and (boundp 'byte-compile-current-file)
+                      byte-compile-current-file)
+             (or (require feature nil t) (load libfile t t)))
+           (let ((history (assoc libfile load-history))
                  (source (with-temp-buffer
                            (insert-file-contents srcfile)
-                           (setup--read-all (current-buffer))))
-                 (beg-time (make-symbol "")))
-             `(let ((,beg-time (current-time)))
-                (unless (assoc ,libfile load-history)
-                  (with-no-warnings
-                    ;; To suppress warnings, macroexpand source with
-                    ;; no warnings before starting compilation.  (The
-                    ;; author of .emacs considered not responsible for
-                    ;; the warnings in included libraries)
-                    ,@(cdr (with-no-warnings
-                             (macroexpand-all (cons 'progn source)))))
+                           (setup--read-all (current-buffer)))))
+             `(let ((beg-time (current-time)))
+                (unless (featurep ',feature)
+                  ;; The author of .emacs considered not responsible
+                  ;; for the warnings in included libraries
+                  (with-no-warnings ,@source)
                   (push ',history load-history)
                   (do-after-load-evaluation ,libfile))
                 (condition-case err
                     (progn ,@body
                            (message ">> [init] %s: succeeded in %d msec" ,file
                                     (let ((now (current-time)))
-                                      (+ (* (- (nth 1 now) (nth 1 ,beg-time)) 1000)
-                                         (/ (- (nth 2 now) (nth 2 ,beg-time)) 1000)))))
+                                      (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
+                                         (/ (- (nth 2 now) (nth 2 beg-time)) 1000)))))
                   (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))
           ((and libfile
-                (or (not (and (boundp 'byte-compile-current-file)
-                              byte-compile-current-file))
-                    (if (eq setup-include-allow-runtime-load 'undef)
-                        (setq setup-include-allow-runtime-load
-                              (y-or-n-p (concat "Some libraries are not includable."
-                                                " Load them during runtime ?")))
-                      setup-include-allow-runtime-load)))
+                (or
+                 ;; we do not need to ask loading during runtime
+                 (not (and (boundp 'byte-compile-current-file)
+                           byte-compile-current-file))
+                 ;; we do need to ask loading during compile
+                 (if (eq setup-include-allow-runtime-load 'undef)
+                     (setq setup-include-allow-runtime-load
+                           (y-or-n-p (concat "Some libraries are not includable."
+                                             " Load them during runtime ?")))
+                   setup-include-allow-runtime-load)))
            `(setup ,file ,@body))
           (t
            (byte-compile-warn "%s not found" file)
@@ -240,25 +239,26 @@ of loading it during runtime."
 (defmacro setup-lazy (triggers file &rest body)
   "Load FILE on TRIGGERS. When loaded, eval BODY."
   (declare (indent defun))
-  (cond ((not (locate-library file))
-         (byte-compile-warn "%s not found" file)
-         nil)
-        (t
-         (let ((prepare (when (and body (eq (car body) :prepare))
-                          (prog1 (cadr body) (setq body (cddr body))))))
+  (cond ((locate-library file)
+         (let ((preparation (when (and body (eq (car body) :prepare))
+                              (prog1 (cadr body) (setq body (cddr body))))))
            `(progn
-              (dolist (trigger ,triggers)
-                (autoload trigger ,file nil t))
-              ,(when prepare
+              (mapc (lambda (trigger)
+                      (autoload trigger ,file nil t))
+                    ,triggers)
+              ,(when preparation
                  `(condition-case err
-                      ,prepare
+                      ,preparation
                     (error (message "XX [init] %s: %s" ,file (error-message-string err)))))
               (eval-after-load ,file
                 ',(macroexpand-all
                    `(condition-case err
                         (progn ,@body
                                (message "<< [init] %s: loaded" ,file))
-                      (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))))))
+                      (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))))
+        (t
+         (byte-compile-warn "%s not found" file)
+         nil)))
 
 ;; + pre/post-load evaluation
 
@@ -287,48 +287,56 @@ of loading it during runtime."
   "Load FILE in idle-time."
   (when (locate-library file)
     (let* ((feature (intern file))
-           (libfile (locate-library file))
-           (load-expr (if (featurep feature)
-                          `(require ',feature nil t)
-                        `(load ,libfile t t))))
-      `(run-with-idle-timer 15 nil (lambda () ,load-expr)))))
+           (libfile (locate-library file)))
+      ;; load during compile
+      (when (and (boundp 'byte-compile-current-file)
+                 byte-compile-current-file)
+        (or (require feature nil t) (load libfile t t)))
+      `(run-with-idle-timer 15 nil
+                            (lambda ()
+                              ,(if (featurep feature)
+                                   `(unless (featurep ',feature)
+                                      (load ,libfile t t))
+                                 `(load ,libfile t t)))))))
 
 ;; + other utilities
 
 (defun setup--list->tuples (lst)
-  (when lst (cons (cons (car lst) (cadr lst)) (setup--list->tuples (cddr lst)))))
+  (when lst
+    (cons (cons (car lst) (cadr lst))
+          (setup--list->tuples (cddr lst)))))
 (defmacro setup-keybinds (keymap &rest binds)
-  "Add BINDS to KEYMAP. BINDS must be a list of (KEYS DEF KEYS
-DEF ...) where KEYS can be one of a string accepted by \"kbd\",
-an event accepted by \"define-key\", or a list of above, and
-COMMAND can be an object that \"define-key\" accepts or a list of
-the form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
+  "Add BINDS to KEYMAP. If KEYMAP is nil, add to the global map
+instead. BINDS must be a list of (KEYS DEF KEYS DEF ...) where
+KEYS can be one of a string accepted by \"kbd\", an event
+accepted by \"define-key\", or a list of above, and DEF can be an
+object that \"define-key\" accepts or a list of the
+form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
   (declare (indent 1))
-  (let ((kmap (make-symbol "")))
-    `(let ((,kmap (or ,keymap (current-global-map))))
-       ,@(mapcar
-          (lambda (bind)
-            (let* ((keys (eval (car bind)))
-                   (def (eval (cdr bind)))
-                   file absfile comm
-                   (command (cond ((not (and (listp def)
-                                             (stringp (car def))))
-                                   `(quote ,def))
-                                  ((and (setq file (car def))
-                                        (setq absfile (locate-library (car def)))
-                                        (file-exists-p absfile))
-                                   (let ((command (cadr def)))
-                                     `(progn (setup-expecting ,file) ',command)))
-                                  (t
-                                   `(quote ,(or (nth 2 def) 'ignore))))))
-              (cond
-               ((listp keys)
-                (setq keys (mapcar (lambda (k) (if (stringp k) (kbd k) k)) keys))
-                `(dolist (key ',keys) (define-key ,kmap key ,command)))
-               (t
-                (setq keys (if (stringp keys) (kbd keys) keys))
-                `(define-key ,kmap ,keys ,command)))))
-          (setup--list->tuples binds)))))
+  `(let ((kmap ,(if (null keymap) `(current-global-map) keymap)))
+     ,@(mapcar
+        (lambda (bind)
+          (let* ((keys (eval (car bind)))
+                 (def (eval (cdr bind)))
+                 (command (cond ((not (and (listp def) (stringp (car def))))
+                                 `',def)
+                                ((locate-library (car def))
+                                 `',(cadr def))
+                                (t
+                                 `',(or (nth 2 def) 'ignore)))))
+            (cond
+             ((listp keys)
+              `(progn
+                 ,@(mapcar (lambda (k)
+                             (if (stringp k)
+                                 `(define-key kmap ,(kbd k) ,command)
+                               `(define-key kmap ,k ,command)))
+                           keys)))
+             (t
+              (if (stringp keys)
+                  `(define-key kmap ,(kbd keys) ,command)
+                `(define-key kmap ,keys ,command))))))
+        (setup--list->tuples binds))))
 
 (defmacro setup-hook (hook &rest exprs)
   (declare (indent 1))
