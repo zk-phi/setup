@@ -100,7 +100,7 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
                                    (lambda ()
                                      (if setup-delay-queue
                                          (eval (pop setup-delay-queue))
-                                       (message ">> [init] delayed setup(s) completed.")
+                                       (message ">> [init] all delayed setup completed.")
                                        (cancel-timer setup-delay-timer-object)))))
                  (message ">> [init] TOTAL: %d msec"
                           (let ((now (current-time)))
