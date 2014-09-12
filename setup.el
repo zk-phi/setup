@@ -18,7 +18,7 @@
 
 ;; Author: zk_phi
 ;; URL: http://hins11.yu-yake.com/
-;; Version: 1.0.2
+;; Version: 1.0.3
 
 ;;; Commentary:
 
@@ -43,13 +43,14 @@
 ;; 1.0.0 first released
 ;; 1.0.1 add setup-hook macro
 ;; 1.0.2 change anaphoric macros' API
+;; 1.0.3 add delayed execution "!-"
 
 ;;; Code:
 
 (require 'find-func)
 (require 'macroexp)
 
-(defconst setup-version "1.0.2")
+(defconst setup-version "1.0.3")
 
 ;; + customizable vars
 
