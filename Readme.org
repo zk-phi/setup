@@ -8,9 +8,8 @@ Helper macros to write faster, portable and robust init script
 
 - API for anaphoric macros is changed.
 
-  Please use =(! it)= or =(!it)= instead of =(it)=. You can also write
-  more complex expressions inside =(! ...)=, for example: =(! (car
-  it))=.
+  Please use =​,it= instead of =(it)=. You can also write more complex
+  expressions like =​,(car it)=.
 
 - new anaphoric macro: =!foreach=
 
@@ -21,7 +20,7 @@ Helper macros to write faster, portable and robust init script
     (!foreach '((text-mode-hook . electric-spacing-mode)
                 (latex-mode-hook . magic-latex-buffer)
                 (lisp-mode-hook . highlight-stages-lisp-initialize))
-      (add-hook (! (car it)) (! (cdr it))))
+      (add-hook ,(car it) ,(cdr it)))
   #+end_src
 
   this is equivalent to:
@@ -203,26 +202,26 @@ overheads. This requires you to compile the init script on each
 systems you use, but runs slightly faster on startup.
 
 In addition, =!case= is an anaphoric macro, so the results of the test
-can be refered with =(! it)= in body :
+can be refered with =​,it= in body :
 
 #+begin_src emacs-lisp
   (!case emacs-major-version
     ((24 23)   (message "Welcome to Emacs!"))
-    (otherwise (error "Emacs version %d is unsupported." (! it))))
+    (otherwise (error "Emacs version %d is unsupported." ,it)))
 #+end_src
 
-=(! it)= is also substituted *during compile* thus this makes init
-script no slower. =(!it)= is a shorthand for =(! it)=.
+=​,it= is also substituted *during compile* thus this makes init script
+no slower. More complex expressions can also be written after =​,​=,
+=​,(car it)= for example.
 
 Other anaphoric macros provided by setup.el are: =!if=, =!when=,
-=!cond=, =!unless=, =!foreach=. More complex expressions can also be
-passed to =!=:
+=!cond=, =!unless=, =!foreach=.
 
 #+begin_src emacs-lisp
   (!foreach '((text-mode-hook . electric-spacing-mode)
               (latex-mode-hook . magic-latex-buffer)
               (lisp-mode-hook . highlight-stages-lisp-initialize))
-    (add-hook (! (car it)) (! (cdr it))))
+    (add-hook ,(car it) ,(cdr it)))
 #+end_src
 
 For compile-time execution, following (anaphoric) macros are also

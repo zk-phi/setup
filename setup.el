@@ -70,6 +70,9 @@ the source file is not found.")
 value between compile-time and runtime, and warning message shown
 when the value differes.")
 
+(defvar setup-idle-time 0.1
+  "Idle time for !-.")
+
 ;; + font-lock keywords for elisp mode
 
 (eval-after-load "lisp-mode"
@@ -101,83 +104,6 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
                                     ,(concat (cdr pair) " Really continue ? "))))
                             setup-environ-warning-alist))
        (error "Setup canceled."))))
-
-;; + compile-time execution
-
-(defun setup--make-anaphoric-macros (value)
-  `((!it . (lambda () '',value))
-    (! . (lambda (&rest body) `',(funcall `(lambda (it) ,@body) ',value)))))
-
-(defmacro setup-eval (sexp)
-  "Eval during compile."
-  `',(eval sexp))
-
-(defmacro setup-if (test then &rest else)
-  "Like \"if\" but anaphoric and expanded during compile."
-  (declare (indent 2))
-  (setq test (eval test))
-  (macroexpand-all (if test then (if (cadr else) `(progn,@else) (car else)))
-                   (setup--make-anaphoric-macros test)))
-
-(defmacro setup-when (test &rest body)
-  "Like \"when\" but anaphoric and expanded during compile."
-  (declare (indent 1))
-  (setq test (eval test))
-  (macroexpand-all (when test (if (cadr body) `(progn ,@body) (car body)))
-                   (setup--make-anaphoric-macros test)))
-
-(defmacro setup-unless (test &rest body)
-  "Like \"unless\" but anaphoric and expanded during compile."
-  (declare (indent 1))
-  (setq test (eval test))
-  (macroexpand-all (unless test (if (cadr body) `(progn ,@body) (car body)))
-                   (setup--make-anaphoric-macros test)))
-
-(defmacro setup-cond (&rest clauses)
-  "Like \"cond\" but anaphoric and expanded during compile."
-  (let (val)
-    (while (and clauses
-                (not (setq val (eval (caar clauses)))))
-      (setq clauses (cdr clauses)))
-    (setq clauses (cdar clauses))
-    (macroexpand-all (if (cadr clauses) `(progn ,@clauses) (car clauses))
-                     (setup--make-anaphoric-macros val))))
-
-(defmacro setup-case (expr &rest clauses)
-  "Like \"case\" but anaphoric and expanded during compile."
-  (declare (indent 1))
-  (setq expr (eval expr))
-  (while (and clauses
-              (let ((keylist (caar clauses)))
-                (and (not (and (null (cdr clauses))
-                               (memq keylist '(t otherwise))))
-                     (not (and (consp keylist)
-                               (memql expr keylist)))
-                     (not (and (atom keylist)
-                               (eql expr keylist))))))
-    (setq clauses (cdr clauses)))
-  (setq clauses (cdar clauses))
-  (macroexpand-all (if (cadr clauses) `(progn ,@clauses) (car clauses))
-                   (setup--make-anaphoric-macros expr)))
-
-(defmacro setup-foreach (list &rest body)
-  "Eval BODY for each elements in LIST. The current element can
-  be referred with \"(it)\"."
-  (declare (indent 1))
-  `(progn ,@(mapcar
-             (lambda (elem)
-               (macroexpand-all
-                (if (cadr body) `(progn ,@body) (car body))
-                (setup--make-anaphoric-macros elem)))
-             (eval list))))
-
-(defalias '! 'setup-eval)
-(defalias '!if 'setup-if)
-(defalias '!when 'setup-when)
-(defalias '!cond 'setup-cond)
-(defalias '!case 'setup-case)
-(defalias '!unless 'setup-unless)
-(defalias '!foreach 'setup-foreach)
 
 ;; + load and configure libraries
 
@@ -323,6 +249,79 @@ of loading it during runtime."
                                    `(unless (featurep ',feature)
                                       (load ,libfile t t))
                                  `(load ,libfile t t)))))))
+
+;; + compile-time execution
+
+(defun setup--make-anaphoric-macros (value)
+  `((,'\, . (lambda (&rest body) `',(funcall `(lambda (it) ,@body) ',value)))))
+
+(defmacro ! (sexp)
+  "Eval during compile."
+  `',(eval sexp))
+
+(defmacro !if (test then &rest else)
+  "Like \"if\" but anaphoric and expanded during compile."
+  (declare (indent 2))
+  (setq test (eval test))
+  (macroexpand-all (if test then (if (cadr else) `(progn,@else) (car else)))
+                   (setup--make-anaphoric-macros test)))
+
+(defmacro !when (test &rest body)
+  "Like \"when\" but anaphoric and expanded during compile."
+  (declare (indent 1))
+  (setq test (eval test))
+  (macroexpand-all (when test (if (cadr body) `(progn ,@body) (car body)))
+                   (setup--make-anaphoric-macros test)))
+
+(defmacro !unless (test &rest body)
+  "Like \"unless\" but anaphoric and expanded during compile."
+  (declare (indent 1))
+  (setq test (eval test))
+  (macroexpand-all (unless test (if (cadr body) `(progn ,@body) (car body)))
+                   (setup--make-anaphoric-macros test)))
+
+(defmacro !cond (&rest clauses)
+  "Like \"cond\" but anaphoric and expanded during compile."
+  (let (val)
+    (while (and clauses
+                (not (setq val (eval (caar clauses)))))
+      (setq clauses (cdr clauses)))
+    (setq clauses (cdar clauses))
+    (macroexpand-all (if (cadr clauses) `(progn ,@clauses) (car clauses))
+                     (setup--make-anaphoric-macros val))))
+
+(defmacro !case (expr &rest clauses)
+  "Like \"case\" but anaphoric and expanded during compile."
+  (declare (indent 1))
+  (setq expr (eval expr))
+  (while (and clauses
+              (let ((keylist (caar clauses)))
+                (and (not (and (null (cdr clauses))
+                               (memq keylist '(t otherwise))))
+                     (not (and (consp keylist)
+                               (memql expr keylist)))
+                     (not (and (atom keylist)
+                               (eql expr keylist))))))
+    (setq clauses (cdr clauses)))
+  (setq clauses (cdar clauses))
+  (macroexpand-all (if (cadr clauses) `(progn ,@clauses) (car clauses))
+                   (setup--make-anaphoric-macros expr)))
+
+(defmacro !foreach (list &rest body)
+  "Eval BODY for each elements in LIST. The current element can
+  be referred with \"(it)\"."
+  (declare (indent 1))
+  `(progn ,@(mapcar
+             (lambda (elem)
+               (macroexpand-all
+                (if (cadr body) `(progn ,@body) (car body))
+                (setup--make-anaphoric-macros elem)))
+             (eval list))))
+
+;; + delayed execution
+
+(defmacro !- (&rest body)
+  `(run-with-idle-timer ,setup-idle-time nil (lambda () ,@body)))
 
 ;; + other utilities
 
