@@ -154,9 +154,9 @@ but still much faster.
 *** Method 3: Compile-time Execution
 
 For more severe tune-up, "setup.el" provides a bunch of macros to
-control compile-time executions. The most basic macro is =!= (or
-=setup-eval= as an alias). It evaluates body *during compile* and
-replace itself with the evaluated value.
+control compile-time executions. The most basic macro is =!=. It
+evaluates body *during compile* and replace itself with the evaluated
+value.
 
 For example, the following piece of script :
 
@@ -195,11 +195,11 @@ but, if we know that the init script runs in Mac, then simply
   (setup-include "./init/init-mac.el")
 #+end_src
 
-is faster. "setup.el" provides a macro =!case= (or =setup-case=),
-which is like =case= but the conditional branch is expanded *during
-compile* so that the compiled script can run with no extra
-overheads. This requires you to compile the init script on each
-systems you use, but runs slightly faster on startup.
+is faster. "setup.el" provides a macro =!case=, which is like =case=
+but the conditional branch is expanded *during compile* so that the
+compiled script can run with no extra overheads. This requires you to
+compile the init script on each systems you use, but runs slightly
+faster on startup.
 
 In addition, =!case= is an anaphoric macro, so the results of the test
 can be refered with =​,it= in body :
