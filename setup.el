@@ -104,8 +104,6 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
 
 ;; + compile-time execution
 
-;; macro コンパイル時に eva られる部分に (it) を使えない
-
 (defun setup--make-anaphoric-macros (value)
   `((!it . (lambda () '',value))
     (! . (lambda (&rest body) `',(funcall `(lambda (it) ,@body) ',value)))))
@@ -295,7 +293,7 @@ of loading it during runtime."
   (when (locate-library file)
     `(eval-after-load ,file
        ',(macroexpand-all
-          `(condition-case err (progn ,@body)
+          `(condition-case err ,(if (cadr body) `(progn ,@body) (car body))
              (error (message "XX [init] %s: %s" ,file (error-message-string err))))))))
 
 (defmacro setup-expecting (file &rest body)
@@ -304,7 +302,7 @@ of loading it during runtime."
   (cond ((locate-library file)
          (when (eq (car body) :fallback)
            (setq body (cddr body)))
-         `(condition-case err (progn ,@body)
+         `(condition-case err ,(if (cadr body) `(progn ,@body) (car body))
             (error (message "XX [init] %s: %s" ,file (error-message-string err)))))
         ((eq (car body) :fallback)
          `(condition-case err ,(cadr body)
