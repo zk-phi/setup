@@ -70,8 +70,8 @@ the source file is not found.")
 value between compile-time and runtime, and warning message shown
 when the value differes.")
 
-(defvar setup-idle-time 0.3
-  "Idle time for !-.")
+(defvar setup-delay-interval 0.5
+  "Interval for !-.")
 
 ;; + font-lock keywords for elisp mode
 
@@ -91,8 +91,15 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
   `(progn
      ;; setup stopwatch
      (defvar setup-start-time (current-time))
+     (defvar setup-delay-queue nil)
      (add-hook 'after-init-hook
                (lambda  ()
+                 (defvar setup-delay-timer-object
+                   (run-with-timer ,setup-delay-interval ,setup-delay-interval
+                                   (lambda ()
+                                     (if setup-delay-queue
+                                         (eval (pop setup-delay-queue))
+                                       (cancel-timer setup-delay-timer-object)))))
                  (message ">> [init] TOTAL: %d msec"
                           (let ((now (current-time)))
                             (+ (* (- (nth 1 now) (nth 1 setup-start-time)) 1000)
@@ -250,7 +257,7 @@ of loading it during runtime."
                                       (load ,libfile t t))
                                  `(load ,libfile t t)))))))
 
-;; + compile-time execution
+;; + compile-time execution / delayed execution
 
 (defun setup--make-anaphoric-macros (value)
   `((,'\, . (lambda (&rest body) `',(funcall `(lambda (it) ,@body) ',value)))))
@@ -318,10 +325,9 @@ of loading it during runtime."
                 (setup--make-anaphoric-macros elem)))
              (eval list))))
 
-;; + delayed execution
-
 (defmacro !- (&rest body)
-  `(run-with-idle-timer ,setup-idle-time nil (lambda () ,@body)))
+  `(push ',(macroexpand (if (cadr body) `(progn ,@body) (car body)))
+         setup-delay-queue))
 
 ;; + other utilities
 
