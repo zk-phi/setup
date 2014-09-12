@@ -70,7 +70,7 @@ the source file is not found.")
 value between compile-time and runtime, and warning message shown
 when the value differes.")
 
-(defvar setup-idle-time 0.1
+(defvar setup-idle-time 0.5
   "Idle time for !-.")
 
 ;; + font-lock keywords for elisp mode
