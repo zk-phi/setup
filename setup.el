@@ -76,7 +76,7 @@ when the value differes.")
     'emacs-lisp-mode
     '(("(\\(setup\\(?:-\\(?:in\\(?:clude\\|-idle\\)\\|after\\|expecting\\|lazy\\)\\)?\\)\\_>"
        1 font-lock-keyword-face)
-      ("(\\(!\\(?:foreach\\_>\\|when\\_>\\|if\\_>\\|unless\\_>\\|cond\\_>\\|case\\_>\\|[^\s\t\n]\\)?\\)"
+      ("(\\(!\\(?:it\\_>\\|foreach\\_>\\|when\\_>\\|if\\_>\\|unless\\_>\\|cond\\_>\\|case\\_>\\)?\\)"
        1 font-lock-keyword-face))))
 
 ;; + initialize
@@ -103,6 +103,12 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
 
 ;; + compile-time execution
 
+;; macro コンパイル時に eva られる部分に (it) を使えない
+
+(defun setup--make-anaphoric-macros (value)
+  `((!it . (lambda () '',value))
+    (! . (lambda (&rest body) `',(funcall `(lambda (it) ,@body) ',value)))))
+
 (defmacro setup-eval (sexp)
   "Eval during compile."
   `',(eval sexp))
@@ -111,19 +117,22 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
   "Like \"if\" but anaphoric and expanded during compile."
   (declare (indent 2))
   (setq test (eval test))
-  (macroexpand-all (if test then `(progn ,@else)) `((it . (lambda () '',test)))))
+  (macroexpand-all (if test then (if (cadr else) `(progn,@else) (car else)))
+                   (setup--make-anaphoric-macros test)))
 
 (defmacro setup-when (test &rest body)
   "Like \"when\" but anaphoric and expanded during compile."
   (declare (indent 1))
   (setq test (eval test))
-  (macroexpand-all (when test `(progn ,@body)) `((it . (lambda () '',test)))))
+  (macroexpand-all (when test (if (cadr body) `(progn ,@body) (car body)))
+                   (setup--make-anaphoric-macros test)))
 
 (defmacro setup-unless (test &rest body)
   "Like \"unless\" but anaphoric and expanded during compile."
   (declare (indent 1))
   (setq test (eval test))
-  (macroexpand-all (unless test `(progn ,@body)) `((it . (lambda () '',test)))))
+  (macroexpand-all (unless test (if (cadr body) `(progn ,@body) (car body)))
+                   (setup--make-anaphoric-macros test)))
 
 (defmacro setup-cond (&rest clauses)
   "Like \"cond\" but anaphoric and expanded during compile."
@@ -131,7 +140,9 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
     (while (and clauses
                 (not (setq val (eval (caar clauses)))))
       (setq clauses (cdr clauses)))
-    (macroexpand-all `(progn ,@(cdar clauses)) `((it . (lambda () '',val))))))
+    (setq clauses (cdar clauses))
+    (macroexpand-all (if (cadr clauses) `(progn ,@clauses) (car clauses))
+                     (setup--make-anaphoric-macros val))))
 
 (defmacro setup-case (expr &rest clauses)
   "Like \"case\" but anaphoric and expanded during compile."
@@ -146,15 +157,20 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
                      (not (and (atom keylist)
                                (eql expr keylist))))))
     (setq clauses (cdr clauses)))
-  (macroexpand-all `(progn ,@(cdar clauses)) `((it . (lambda () '',expr)))))
+  (setq clauses (cdar clauses))
+  (macroexpand-all (if (cadr clauses) `(progn ,@clauses) (car clauses))
+                   (setup--make-anaphoric-macros expr)))
 
 (defmacro setup-foreach (list &rest body)
   "Eval BODY for each elements in LIST. The current element can
   be referred with \"(it)\"."
   (declare (indent 1))
-  `(progn ,@(mapcar (lambda (elem)
-                      (macroexpand-all `(progn ,@body) `((it . (lambda () '',elem)))))
-                    (eval list))))
+  `(progn ,@(mapcar
+             (lambda (elem)
+               (macroexpand-all
+                (if (cadr body) `(progn ,@body) (car body))
+                (setup--make-anaphoric-macros elem)))
+             (eval list))))
 
 (defalias '! 'setup-eval)
 (defalias '!if 'setup-if)
@@ -349,8 +365,13 @@ form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
         (setup--list->tuples binds))))
 
 (defmacro setup-hook (hook &rest exprs)
+  "Add (lambda () ,@exprs) to HOOK globally. Variable HOOK must
+be already declared."
   (declare (indent 1))
-  `(add-hook ,hook (lambda () ,@exprs)))
+  `(let ((value (when (default-boundp ,hook) (default-value ,hook))))
+     (if (or (not (listp value)) (eq (car value) 'lambda))
+         (set-default ,hook (list (lambda () ,@exprs) value))
+       (set-default ,hook (cons (lambda () ,@exprs) value)))))
 
 (defun setup-byte-compile-file (&optional file)
   (interactive)
