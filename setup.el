@@ -387,15 +387,11 @@ be already declared."
                         (read-file-name "File: " dir nil t file)))))
     (if (not window-system)
         (shell-command
-         (format "emacs --batch -eval \"
- (progn
-   (setq byte-compile-dynamic t)
-   (byte-compile-file \\\"%s\\\"))\""
+         (format "emacs --batch -eval \" (byte-compile-file \\\"%s\\\")\""
                  filename))
       (let ((returncode (shell-command
                          (format "emacs -q -eval \"
  (progn
-   (setq byte-compile-dynamic t)
    (byte-compile-file \\\"%s\\\")
    (switch-to-buffer \\\"*Compile-Log*\\\")
    (write-region 1 (1+ (buffer-size)) \\\"%s\\\")
