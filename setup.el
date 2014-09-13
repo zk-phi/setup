@@ -103,7 +103,7 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
                                    (lambda ()
                                      (if setup-delay-queue
                                          ,(if setup-delay-silent
-                                              `(flet ((message () nil))
+                                              `(flet ((message (&rest _) nil))
                                                  (eval (pop setup-delay-queue)))
                                             `(eval (pop setup-delay-queue)))
                                        (message ">> [init] all delayed setup completed.")
