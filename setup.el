@@ -72,7 +72,10 @@ value between compile-time and runtime, and warning message shown
 when the value differes.")
 
 (defvar setup-delay-interval 0.7
-  "Interval for !-.")
+  "Delay for delayed setup.")
+
+(defvar setup-delay-silent t
+  "When non-nil, delayed setup does not message.")
 
 ;; + font-lock keywords for elisp mode
 
@@ -99,7 +102,10 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
                    (run-with-timer ,setup-delay-interval ,setup-delay-interval
                                    (lambda ()
                                      (if setup-delay-queue
-                                         (eval (pop setup-delay-queue))
+                                         ,(if setup-delay-silent
+                                              `(flet ((message () nil))
+                                                 (eval (pop setup-delay-queue)))
+                                            `(eval (pop setup-delay-queue)))
                                        (message ">> [init] all delayed setup completed.")
                                        (cancel-timer setup-delay-timer-object)))))
                  (message ">> [init] TOTAL: %d msec"
@@ -371,13 +377,21 @@ form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
         (setup--list->tuples binds))))
 
 (defmacro setup-hook (hook &rest exprs)
-  "Add (lambda () ,@exprs) to HOOK globally. Variable HOOK must
-be already declared."
+  "Add (lambda () ,@exprs) to HOOK. If EXPRS is just a symbol,
+add it without wrapping with \"lambda\". HOOK must be already
+declared. If the first expressions of EXPRS is \"t\", add hook
+locally."
   (declare (indent 1))
-  `(let ((value (when (default-boundp ,hook) (default-value ,hook))))
-     (if (or (not (listp value)) (eq (car value) 'lambda))
-         (set-default ,hook (list (lambda () ,@exprs) value))
-       (set-default ,hook (cons (lambda () ,@exprs) value)))))
+  `(let ((oldvalue (when (default-boundp ,hook) (default-value ,hook))))
+     (if (or (not (listp oldvalue)) (eq (car oldvalue) 'lambda))
+         (set-default ,hook (list ,(if (eq (caar exprs) 'quote)
+                                       (car exprs)
+                                     `(lambda () ,@exprs))
+                                  oldvalue))
+       (set-default ,hook (cons ,(if (eq (caar exprs) 'quote)
+                                     (car exprs)
+                                   `(lambda () ,@exprs))
+                                oldvalue)))))
 
 (defun setup-byte-compile-file (&optional file)
   (interactive)
