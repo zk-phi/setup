@@ -384,8 +384,7 @@ form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
 (defmacro setup-hook (hook &rest exprs)
   "Add (lambda () ,@exprs) to HOOK. If EXPRS is just a symbol,
 add it without wrapping with \"lambda\". HOOK must be already
-declared. If the first expressions of EXPRS is \"t\", add hook
-locally."
+declared."
   (declare (indent 1))
   `(let ((oldvalue (when (default-boundp ,hook) (default-value ,hook))))
      (if (or (not (listp oldvalue)) (eq (car oldvalue) 'lambda))
