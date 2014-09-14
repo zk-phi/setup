@@ -1,6 +1,6 @@
 ;;; setup.el --- helper macros to write faster, portable and robust init script
 
-;; Copyright (C) 2013 zk_phi
+;; Copyright (C) 2013-2014 zk_phi
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -104,6 +104,7 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
                                    (lambda ()
                                      (if setup--delay-queue
                                          ,(if setup-delay-silent
+                                              ;; why is "flet" obsolete ?
                                               `(unwind-protect
                                                    (progn
                                                      (fset 'message (lambda (&rest _) nil))
