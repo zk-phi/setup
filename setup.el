@@ -144,7 +144,7 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
                  `(load ,libfile t t))
               (condition-case err
                   (progn ,@body
-                         (message ">> [init] %s: succeeded in %d msec" ,file
+                         (message ">> [init] %s: loaded in %d msec" ,file
                                   (let ((now (current-time)))
                                     (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
                                        (/ (- (nth 2 now) (nth 2 beg-time)) 1000)))))
@@ -183,7 +183,7 @@ of loading it during runtime."
                   (do-after-load-evaluation ,libfile))
                 (condition-case err
                     (progn ,@body
-                           (message ">> [init] %s: succeeded in %d msec" ,file
+                           (message ">> [init] %s: loaded in %d msec" ,file
                                     (let ((now (current-time)))
                                       (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
                                          (/ (- (nth 2 now) (nth 2 beg-time)) 1000)))))
