@@ -71,7 +71,7 @@ the source file is not found.")
 value between compile-time and runtime, and warning message shown
 when the value differes.")
 
-(defvar setup-delay-interval 0.5
+(defvar setup-delay-interval 0.2
   "Delay for delayed setup.")
 
 (defvar setup-delay-silent t
