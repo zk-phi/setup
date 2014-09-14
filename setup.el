@@ -71,7 +71,7 @@ the source file is not found.")
 value between compile-time and runtime, and warning message shown
 when the value differes.")
 
-(defvar setup-delay-interval 0.7
+(defvar setup-delay-interval 0.5
   "Delay for delayed setup.")
 
 (defvar setup-delay-silent t
@@ -94,24 +94,28 @@ when the value differes.")
 PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
   `(progn
      ;; setup stopwatch
-     (defvar setup-start-time (current-time))
-     (defvar setup-delay-queue nil)
+     (defvar setup--start-time (current-time))
+     (defvar setup--delay-queue nil)
+     (defvar setup--original-message-fn (symbol-function 'message))
      (add-hook 'after-init-hook
                (lambda  ()
-                 (defvar setup-delay-timer-object
+                 (defvar setup--delay-timer-object
                    (run-with-timer ,setup-delay-interval ,setup-delay-interval
                                    (lambda ()
-                                     (if setup-delay-queue
+                                     (if setup--delay-queue
                                          ,(if setup-delay-silent
-                                              `(flet ((message (&rest _) nil))
-                                                 (eval (pop setup-delay-queue)))
-                                            `(eval (pop setup-delay-queue)))
+                                              `(unwind-protect
+                                                   (progn
+                                                     (fset 'message (lambda (&rest _) nil))
+                                                     (eval (pop setup--delay-queue)))
+                                                 (fset 'message setup--original-message-fn))
+                                            `(eval (pop setup--delay-queue)))
                                        (message ">> [init] all delayed setup completed.")
-                                       (cancel-timer setup-delay-timer-object)))))
+                                       (cancel-timer setup--delay-timer-object)))))
                  (message ">> [init] TOTAL: %d msec"
                           (let ((now (current-time)))
-                            (+ (* (- (nth 1 now) (nth 1 setup-start-time)) 1000)
-                               (/ (- (nth 2 now) (nth 2 setup-start-time)) 1000))))))
+                            (+ (* (- (nth 1 now) (nth 1 setup--start-time)) 1000)
+                               (/ (- (nth 2 now) (nth 2 setup--start-time)) 1000))))))
      ;; check and warn about environ
      (unless (and ,@(mapcar (lambda (pair)
                               `(or (equal ',(eval (car pair)) ,(car pair))
@@ -335,7 +339,7 @@ of loading it during runtime."
 
 (defmacro !- (&rest body)
   `(push ',(macroexpand (if (cadr body) `(progn ,@body) (car body)))
-         setup-delay-queue))
+         setup--delay-queue))
 
 ;; + other utilities
 
