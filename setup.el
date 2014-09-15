@@ -94,12 +94,12 @@ when the value differes.")
 PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
   `(progn
      ;; setup stopwatch
-     (defvar setup--start-time (current-time))
+     (defconst setup--start-time (current-time))
+     (defconst setup--original-message-fn (symbol-function 'message))
      (defvar setup--delay-queue nil)
-     (defvar setup--original-message-fn (symbol-function 'message))
      (add-hook 'after-init-hook
                (lambda  ()
-                 (defvar setup--delay-timer-object
+                 (defconst setup--delay-timer-object
                    (run-with-timer ,setup-delay-interval ,setup-delay-interval
                                    (lambda ()
                                      (if setup--delay-queue
@@ -127,6 +127,11 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
 
 ;; + load and configure libraries
 
+(defun setup--byte-compiling-p ()
+  "Return non-nil iff byte compiling is in progress."
+  (and (boundp 'byte-compile-current-file)
+       byte-compile-current-file))
+
 (defmacro setup (file &rest body)
   "Load FILE. Iff succeeded, eval BODY."
   (declare (indent defun))
@@ -134,8 +139,7 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
         (libfile (locate-library file)))
     (cond (libfile
            ;; load during compile
-           (when (and (boundp 'byte-compile-current-file)
-                      byte-compile-current-file)
+           (when (setup--byte-compiling-p)
              (or (require feature nil t) (load libfile t t)))
            `(let ((beg-time (current-time)))
               ,(if (featurep feature)
@@ -167,8 +171,7 @@ of loading it during runtime."
                      (expand-file-name file))))
     (cond ((and srcfile (file-exists-p srcfile))
            ;; load during compile
-           (when (and (boundp 'byte-compile-current-file)
-                      byte-compile-current-file)
+           (when (setup--byte-compiling-p)
              (or (require feature nil t) (load libfile t t)))
            (let ((history (assoc libfile load-history))
                  (source (with-temp-buffer
@@ -178,7 +181,13 @@ of loading it during runtime."
                 (unless (featurep ',feature)
                   ;; The author of .emacs considered not responsible
                   ;; for the warnings in included libraries
-                  (with-no-warnings ,@source)
+                  (with-no-warnings
+                    ,(macroexpand-all
+                      `(progn ,@source)
+                      `((eval-when-compile
+                          . (lambda (&rest body) `',(eval `(progn ,@body))))
+                        (eval-and-compile
+                          . (lambda (&rest body) (eval `(progn ,@body)) `(progn ,@body))))))
                   (push ',history load-history)
                   (do-after-load-evaluation ,libfile))
                 (condition-case err
@@ -189,16 +198,12 @@ of loading it during runtime."
                                          (/ (- (nth 2 now) (nth 2 beg-time)) 1000)))))
                   (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))
           ((and libfile
-                (or
-                 ;; we do not need to ask loading during runtime
-                 (not (and (boundp 'byte-compile-current-file)
-                           byte-compile-current-file))
-                 ;; we do need to ask loading during compile
-                 (if (eq setup-include-allow-runtime-load 'undef)
-                     (setq setup-include-allow-runtime-load
-                           (y-or-n-p (concat "Some libraries are not includable."
-                                             " Load them during runtime ?")))
-                   setup-include-allow-runtime-load)))
+                (or (not (setup--byte-compiling-p))
+                    (if (eq setup-include-allow-runtime-load 'undef)
+                        (setq setup-include-allow-runtime-load
+                              (y-or-n-p (concat "Some libraries are not includable."
+                                                " Load them during runtime ?")))
+                      setup-include-allow-runtime-load)))
            `(setup ,file ,@body))
           (t
            (byte-compile-warn "%s not found" file)
@@ -260,8 +265,7 @@ of loading it during runtime."
     (let* ((feature (intern file))
            (libfile (locate-library file)))
       ;; load during compile
-      (when (and (boundp 'byte-compile-current-file)
-                 byte-compile-current-file)
+      (when (setup--byte-compiling-p)
         (or (require feature nil t) (load libfile t t)))
       `(run-with-idle-timer 15 nil
                             (lambda ()
@@ -339,7 +343,7 @@ of loading it during runtime."
              (eval list))))
 
 (defmacro !- (&rest body)
-  `(push ',(macroexpand (if (cadr body) `(progn ,@body) (car body)))
+  `(push ',(macroexpand-all (if (cadr body) `(progn ,@body) (car body)))
          setup--delay-queue))
 
 ;; + other utilities
