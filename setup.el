@@ -276,7 +276,7 @@ of loading it during runtime."
 
 ;; + compile-time execution / delayed execution
 
-(defun setup--make-anaphoric-macros (value)
+(defun setup--make-anaphoric-env (value)
   `((,'\, . (lambda (&rest body) `',(funcall `(lambda (it) ,@body) ',value)))))
 
 (defmacro ! (sexp)
@@ -288,21 +288,21 @@ of loading it during runtime."
   (declare (indent 2))
   (setq test (eval test))
   (macroexpand-all (if test then (if (cadr else) `(progn,@else) (car else)))
-                   (setup--make-anaphoric-macros test)))
+                   (setup--make-anaphoric-env test)))
 
 (defmacro !when (test &rest body)
   "Like \"when\" but anaphoric and expanded during compile."
   (declare (indent 1))
   (setq test (eval test))
   (macroexpand-all (when test (if (cadr body) `(progn ,@body) (car body)))
-                   (setup--make-anaphoric-macros test)))
+                   (setup--make-anaphoric-env test)))
 
 (defmacro !unless (test &rest body)
   "Like \"unless\" but anaphoric and expanded during compile."
   (declare (indent 1))
   (setq test (eval test))
   (macroexpand-all (unless test (if (cadr body) `(progn ,@body) (car body)))
-                   (setup--make-anaphoric-macros test)))
+                   (setup--make-anaphoric-env test)))
 
 (defmacro !cond (&rest clauses)
   "Like \"cond\" but anaphoric and expanded during compile."
@@ -312,7 +312,7 @@ of loading it during runtime."
       (setq clauses (cdr clauses)))
     (setq clauses (cdar clauses))
     (macroexpand-all (if (cadr clauses) `(progn ,@clauses) (car clauses))
-                     (setup--make-anaphoric-macros val))))
+                     (setup--make-anaphoric-env val))))
 
 (defmacro !case (expr &rest clauses)
   "Like \"case\" but anaphoric and expanded during compile."
@@ -329,7 +329,7 @@ of loading it during runtime."
     (setq clauses (cdr clauses)))
   (setq clauses (cdar clauses))
   (macroexpand-all (if (cadr clauses) `(progn ,@clauses) (car clauses))
-                   (setup--make-anaphoric-macros expr)))
+                   (setup--make-anaphoric-env expr)))
 
 (defmacro !foreach (list &rest body)
   "Eval BODY for each elements in LIST. The current element can
@@ -339,7 +339,7 @@ of loading it during runtime."
              (lambda (elem)
                (macroexpand-all
                 (if (cadr body) `(progn ,@body) (car body))
-                (setup--make-anaphoric-macros elem)))
+                (setup--make-anaphoric-env elem)))
              (eval list))))
 
 (defmacro !- (&rest body)
