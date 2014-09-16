@@ -218,6 +218,10 @@ of loading it during runtime."
          (let ((triggers (eval triggers))
                (preparation (when (and body (eq (car body) :prepare))
                               (prog1 (cadr body) (setq body (cddr body))))))
+           ;; load during compile
+           (eval preparation)
+           (when (setup--byte-compiling-p)
+             (or (require (intern file) nil t) (load file t t)))
            `(progn
               ,@(mapcar (lambda (trigger)
                           `(autoload ',trigger ,file nil t))
