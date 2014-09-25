@@ -84,7 +84,7 @@ when the value differes.")
     'emacs-lisp-mode
     '(("(\\(setup\\(?:-\\(?:in\\(?:clude\\|-idle\\)\\|after\\|expecting\\|lazy\\)\\)?\\)\\_>"
        1 font-lock-keyword-face)
-      ("(\\(!\\(?:it\\_>\\|foreach\\_>\\|when\\_>\\|if\\_>\\|unless\\_>\\|cond\\_>\\|case\\_>\\)?\\)"
+      ("(\\(!-?\\(?:it\\_>\\|foreach\\_>\\|when\\_>\\|if\\_>\\|unless\\_>\\|cond\\_>\\|case\\_>\\)?\\)"
        1 font-lock-keyword-face))))
 
 ;; + initialize
@@ -219,8 +219,8 @@ of loading it during runtime."
                (preparation (when (and body (eq (car body) :prepare))
                               (prog1 (cadr body) (setq body (cddr body))))))
            ;; load during compile
-           (eval preparation)
            (when (setup--byte-compiling-p)
+             (eval preparation)
              (or (require (intern file) nil t) (load file t t)))
            `(progn
               ,@(mapcar (lambda (trigger)
