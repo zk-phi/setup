@@ -1,6 +1,6 @@
 ;;; setup.el --- helper macros to write faster, portable and robust init script
 
-;; Copyright (C) 2013-2014 zk_phi
+;; Copyright (C) 2013-2015 zk_phi
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -47,9 +47,9 @@
 
 ;;; Code:
 
-(require 'find-func)
-(require 'macroexp)
-(require 'bytecomp)
+(require 'find-func)    ; find-library-name
+(require 'macroexp)     ; macroexpand-all
+(require 'bytecomp)     ; byte-compile-current-file, byte-compile-warn
 
 (defconst setup-version "1.0.3")
 
@@ -75,7 +75,7 @@ when the value differes.")
 (defvar setup-delay-interval 0.1
   "Delay for delayed setup.")
 
-(defvar setup-delay-silent t
+(defvar setup-delay-silent nil
   "When non-nil, delayed setup does not message.")
 
 ;; + font-lock keywords for elisp mode
