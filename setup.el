@@ -56,8 +56,8 @@
 ;; + customizable vars
 
 (defvar setup-include-allow-runtime-load 'undef
-  "When non-nil, setup-include can load libraries in runtime, if
-the source file is not found.")
+  "When non-nil, allow `setup-include' to load libraries in
+runtime, if the source file is not found.")
 
 (defvar setup-environ-warning-alist
   '(((system-name)
@@ -68,12 +68,13 @@ the source file is not found.")
      . "Init script is not compiled by this user.")
     (emacs-version
      . "Init script is not compiled with this version of Emacs."))
-  "Alist of expressions that must be evaluated to the \"equal\"
-value between compile-time and runtime, and warning message shown
-when the value differes.")
+  "Alist of expressions Vs messages. Each expressions are
+evaluated everytime on startup, and when some of them evaluates
+to a different value from the value evaluated during compile,
+warning message are shown.")
 
 (defvar setup-delay-interval 0.1
-  "Delay for delayed setup.")
+  "Delay for delayed setup `!-'.")
 
 (defvar setup-delay-silent nil
   "When non-nil, delayed setup does not message.")
@@ -91,8 +92,8 @@ when the value differes.")
 ;; + initialize
 
 (defmacro setup-initialize ()
-  "This macro is replaced with an initializing routine during compile.
-PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
+  "This macro is replaced with an initializing routine when expanded.
+*PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT.*"
   `(progn
      ;; setup stopwatch
      (defconst setup--start-time (current-time))
@@ -129,17 +130,17 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
 ;; + load and configure libraries
 
 (defun setup--byte-compiling-p ()
-  "Return non-nil iff byte compiling is in progress."
+  "Return non-nil iff byte-compile is in progress."
   (and (boundp 'byte-compile-current-file)
        byte-compile-current-file))
 
 (defmacro setup (file &rest body)
-  "Load FILE. Iff succeeded, eval BODY."
+  "Load FILE and evaluate BODY, iff FILE exists."
   (declare (indent defun))
   (let ((feature (intern file))
         (libfile (locate-library file)))
     (cond (libfile
-           ;; load during compile
+           ;; load during compile to avoid warnings
            (when (setup--byte-compiling-p)
              (or (require feature nil t) (load libfile t t)))
            `(let ((beg-time (current-time)))
@@ -159,12 +160,10 @@ PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT."
            nil))))
 
 (defun setup--read-all (stream)
-  (condition-case nil
-      (cons (read stream) (setup--read-all stream))
-    (error nil)))
+  (ignore-errors (cons (read stream) (setup--read-all stream))))
 (defmacro setup-include (file &rest body)
-  "Like \"setup\", but inserts the library source there instead
-of loading it during runtime."
+  "Like `setup', but includes FILE to the compiled init script
+instead of loading it."
   (declare (indent 1))
   (let ((feature (intern file))         ; string->symbol
         (libfile (locate-library file))
@@ -213,7 +212,8 @@ of loading it during runtime."
 ;; + autoload libraries
 
 (defmacro setup-lazy (triggers file &rest body)
-  "Load FILE on TRIGGERS. When loaded, eval BODY."
+  "Load FILE and evaluate BODY when a function listed in TRIGGERS
+is invoked, if FILE exists."
   (declare (indent defun))
   (cond ((locate-library file)
          (let ((triggers (eval triggers))
@@ -265,7 +265,7 @@ of loading it during runtime."
             (error (message "XX [init] %s" (error-message-string err)))))))
 
 (defmacro setup-in-idle (file)
-  "Load FILE in idle-time."
+  "Load FILE during idle-time."
   (when (locate-library file)
     (let* ((feature (intern file))
            (libfile (locate-library file)))
@@ -282,35 +282,40 @@ of loading it during runtime."
 ;; + compile-time execution / delayed execution
 
 (defun setup--make-anaphoric-env (value)
+  "Internal function for anaphoric macros."
   `((,'\, . (lambda (&rest body) `',(funcall `(lambda (it) ,@body) ',value)))))
 
 (defmacro ! (sexp)
-  "Eval during compile."
+  "Eval SEXP during compile."
   `',(eval sexp))
 
 (defmacro !if (test then &rest else)
-  "Like \"if\" but anaphoric and expanded during compile."
+  "Like `if' but anaphoric (TEST value can be referred with
+`,it') and expanded statically."
   (declare (indent 2))
   (setq test (eval test))
   (macroexpand-all (if test then (if (cadr else) `(progn,@else) (car else)))
                    (setup--make-anaphoric-env test)))
 
 (defmacro !when (test &rest body)
-  "Like \"when\" but anaphoric and expanded during compile."
+  "Like `when' but anaphoric (TEST value can be referred with
+`,it') and expanded statically."
   (declare (indent 1))
   (setq test (eval test))
   (macroexpand-all (when test (if (cadr body) `(progn ,@body) (car body)))
                    (setup--make-anaphoric-env test)))
 
 (defmacro !unless (test &rest body)
-  "Like \"unless\" but anaphoric and expanded during compile."
+  "Like `unless' but anaphoric (TEST value can be referred with
+`,it') and expanded statically."
   (declare (indent 1))
   (setq test (eval test))
   (macroexpand-all (unless test (if (cadr body) `(progn ,@body) (car body)))
                    (setup--make-anaphoric-env test)))
 
 (defmacro !cond (&rest clauses)
-  "Like \"cond\" but anaphoric and expanded during compile."
+  "Like `cond' but anaphoric (TEST value can be referred with
+`,it') and expanded statically."
   (let (val)
     (while (and clauses
                 (not (setq val (eval (caar clauses)))))
@@ -320,7 +325,8 @@ of loading it during runtime."
                      (setup--make-anaphoric-env val))))
 
 (defmacro !case (expr &rest clauses)
-  "Like \"case\" but anaphoric and expanded during compile."
+  "Like `case' but anaphoric (TEST value can be referred with
+`,it') and expanded statically."
   (declare (indent 1))
   (setq expr (eval expr))
   (while (and clauses
@@ -338,7 +344,7 @@ of loading it during runtime."
 
 (defmacro !foreach (list &rest body)
   "Eval BODY for each elements in LIST. The current element can
-  be referred with \"(it)\"."
+  be referred with `,it'."
   (declare (indent 1))
   `(progn ,@(mapcar
              (lambda (elem)
@@ -348,22 +354,24 @@ of loading it during runtime."
              (eval list))))
 
 (defmacro !- (&rest body)
+  "Eval BODY when Emacs started up with slight delay. This works
+like a pseudo asynchronous process."
   `(push ',(macroexpand-all (if (cadr body) `(progn ,@body) (car body)))
          setup--delay-queue))
 
 ;; + other utilities
 
 (defun setup--list->tuples (lst)
-  (when lst
-    (cons (cons (car lst) (cadr lst))
-          (setup--list->tuples (cddr lst)))))
+  (when lst (cons (cons (car lst) (cadr lst)) (setup--list->tuples (cddr lst)))))
 (defmacro setup-keybinds (keymap &rest binds)
   "Add BINDS to KEYMAP. If KEYMAP is nil, add to the global map
-instead. BINDS must be a list of (KEYS DEF KEYS DEF ...) where
-KEYS can be one of a string accepted by \"kbd\", an event
-accepted by \"define-key\", or a list of above, and DEF can be an
-object that \"define-key\" accepts or a list of the
-form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
+instead. Each element in BINDS must be a list of the form (KEYS
+DEF KEYS DEF ...)  where KEYS can be one of a string accepted by
+`kbd', an event accepted by `define-key', or a list of above. DEF
+can be an arbitrary object that `define-key' accepts, or a list
+of the form (\"FILE\" THENCOMMAND :optional ELSECOMMAND]). In
+that case, bind THENCOMMAND when FILE exists, or ELSECOMMAND
+otherwise."
   (declare (indent 1))
   `(let ((kmap ,(if (null keymap) `(current-global-map) keymap)))
      ,@(mapcar
@@ -392,7 +400,7 @@ form (\"FILE\" THENCOMMAND :optional ELSECOMMAND])."
 
 (defmacro setup-hook (hook &rest exprs)
   "Add (lambda () ,@exprs) to HOOK. If EXPRS is just a symbol,
-add it without wrapping with \"lambda\". HOOK must be already
+add it without wrapping with `lambda'. HOOK must be already
 declared."
   (declare (indent 1))
   `(let ((oldvalue (when (default-boundp ,hook) (default-value ,hook))))
@@ -407,6 +415,7 @@ declared."
                                 oldvalue)))))
 
 (defun setup-byte-compile-file (&optional file)
+  "Byte-compile FILE in a clean environment (emacs -q)."
   (interactive)
   (when (and (buffer-modified-p)
              (y-or-n-p (format "Save buffer %s first ? "
