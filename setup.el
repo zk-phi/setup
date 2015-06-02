@@ -367,14 +367,14 @@ like a pseudo asynchronous process."
 (defun setup--list->tuples (lst)
   (when lst (cons (cons (car lst) (cadr lst)) (setup--list->tuples (cddr lst)))))
 (defmacro setup-keybinds (keymap &rest binds)
-  "Add BINDS to KEYMAP. If KEYMAP is nil, add to the global map
-instead. Each element in BINDS must be a list of the form (KEYS
-DEF KEYS DEF ...)  where KEYS can be one of a string accepted by
-`kbd', an event accepted by `define-key', or a list of above. DEF
-can be an arbitrary object that `define-key' accepts, or a list
-of the form (\"FILE\" THENCOMMAND :optional ELSECOMMAND]). In
-that case, bind THENCOMMAND when FILE exists, or ELSECOMMAND
-otherwise."
+  "Add BINDS to KEYMAP and return KEYMAP. If KEYMAP is nil, add
+to the global map instead. Each element in BINDS must be a list
+of the form (KEYS DEF KEYS DEF ...)  where KEYS can be one of a
+string accepted by `kbd', an event accepted by `define-key', or a
+list of above. DEF can be an arbitrary object that `define-key'
+accepts, or a list of the form (\"FILE\" THENCOMMAND :optional
+ELSECOMMAND]). In that case, bind THENCOMMAND when FILE exists,
+or ELSECOMMAND otherwise."
   (declare (indent 1))
   `(let ((kmap ,(if (null keymap) `(current-global-map) keymap)))
      ,@(mapcar
@@ -399,7 +399,8 @@ otherwise."
               (if (stringp keys)
                   `(define-key kmap ,(kbd keys) ,command)
                 `(define-key kmap ,keys ,command))))))
-        (setup--list->tuples binds))))
+        (setup--list->tuples binds))
+     kmap))
 
 (defmacro setup-hook (hook &rest exprs)
   "Add (lambda () ,@exprs) to HOOK. If EXPRS is just a symbol,
