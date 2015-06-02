@@ -79,6 +79,9 @@ warning message are shown.")
 (defvar setup-delay-silent nil
   "When non-nil, delayed setup does not message.")
 
+(defvar setup-idle-threshold 13
+  "Idle time threshold in seconds to invoke `setup-in-idle'.")
+
 ;; + font-lock keywords for elisp mode
 
 (eval-after-load "lisp-mode"
@@ -272,7 +275,7 @@ is invoked, if FILE exists."
       ;; load during compile
       (when (setup--byte-compiling-p)
         (or (require feature nil t) (load libfile t t)))
-      `(run-with-idle-timer 15 nil
+      `(run-with-idle-timer ,setup-idle-threshold nil
                             (lambda ()
                               ,(if (featurep feature)
                                    `(unless (featurep ',feature)
