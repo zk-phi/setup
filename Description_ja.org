@@ -1,0 +1,349 @@
+* [Emacs] setup.el で安全・爆速な init.el を書く
+
+Emacs プラグイン setup.el は、安全・爆速な設定ファイルを書くためのマク
+ロ集です。
+
+ここでいう「安全」とは、「セットアップの途中でエラーが出て、ほとんどデ
+フォルトの Emacs が立ち上がる」ような悲劇が起きないことをいいます。
+
+setup.el を使って書かれた設定ファイルがどれくらい爆速かというと、 5000
+行以上の設定が入った Emacs が 0.29 秒でセットアップできるくらい爆速です。
+=emacsclient= の =client= 打ってる間に起動します。
+
+この記事は setup.el の Readme をちょいちょい省きつつ日本語訳した感じの
+何かです。より詳しくは、 Readme の方を参照してくれなくてもいいし、参照
+して英語を添削してくれてもいいです。
+
+** init.el の高速化（１） autoload
+
+速い設定ファイルを書くための一番基本的なテクニックは =autoload= を使う
+ことだと思います。 =autoload= は、プラグインのロードを本当に必要になる
+まで遅延するための方法です。たとえば次のような設定
+
+#+begin_src emacs-lisp
+  (require 'excellent-library)
+
+  (setq excellent-flag t)
+
+  (global-set-key (kbd "C-n") 'excellent-command-1)
+  (global-set-key (kbd "C-p") 'excellent-command-2)
+#+end_src
+
+があったとします。この設定は、おそらく次のように書き換えることができま
+す。
+
+#+begin_src emacs-lisp
+  (autoload 'excellent-command-1 "excellent-library")
+  (autoload 'excellent-command-2 "excellent-library")
+
+  ;; modifying keybinds must be done BEFORE loading
+  (global-set-key (kbd "C-n") 'excellent-command-1)
+  (global-set-key (kbd "C-p") 'excellent-command-2)
+
+  ;; setting "excellent-flag" must be done AFTER loading
+  (eval-after-load "excellent-library"
+    '(setq excellent-flag t))
+#+end_src
+
+もとの設定との違いは、 =excellent-library= が =excellent-command-1= あ
+るいは =excellent-command-2= が呼び出されるまでロードされない点です。起
+動時にいっぺんにすべてが読み込まれるよりだいぶストレスが少ないし、もし
+かしたら最後まで読み込まずに済むかもしれません。
+
+setup.el はこのパターンを簡単に書くためのマクロ =setup-lazy= を提供しま
+す（実は他にも機能がありますが、詳しくは後で）。このマクロによって、上
+の設定は次のように書くことができます。
+
+#+begin_src emacs-lisp
+  (setup-lazy
+    '(excellent-command-1 excellent-command-2) "excellent-library"
+    :prepare (setup-keybinds nil
+               "C-n" 'excellent-command-1
+               "C-p" 'excellent-command-2)
+    (setq excellent-flag t))
+#+end_src
+
+** init.el の高速化（２） include
+
+=autoload= は読み込みを遅延することで設定を高速化しますが、これはすべて
+のプラグインに使えるわけではありません。たとえばカラースキームとかは起
+動時に読み込まれていてほしいですね。
+
+プラグインのファイルを探し出して、開いて、読み込むという処理にはそれな
+りに大変です。そこで setup.el は、少し乱暴な方法ですが、読み込まれるプ
+ラグインの内容をコンパイル時にすべて処理して、設定ファイル本体に埋め込
+んでしまうためのマクロ =setup-include= を提供します。
+
+たとえば別のファイル foo.el に次のようなプログラムが書かれていたとしま
+しょう。
+
+#+begin_src emacs-lisp
+  ;; "foo.el"
+  (foo)
+  (bar)
+  (baz)
+#+end_src
+
+このとき、次の設定
+
+#+begin_src emacs-lisp
+  (setup-include "foo"
+    (hoge)
+    (fuga))
+#+end_src
+
+は
+
+#+begin_src emacs-lisp
+  ;; included from "foo.el"
+  (foo)
+  (bar)
+  (baz)
+
+  (hoge)
+  (fuga)
+#+end_src
+
+とおおむね等価です（実際には、 =load-history= の管理や
+=eval-after-load= の呼び出しなどの処理が入ります）。これは明らかに
+
+#+begin_src emacs-lisp
+  (load "foo")
+
+  (hoge)
+  (fuga)
+#+end_src
+
+より速く実行できます。
+
+** init.el の高速化（３） コンパイル時計算
+
+もっと性能を詰めたい人のために、setup.el はコンパイル時計算を指定する
+ためのマクロを提供します。
+
+一番基本的なマクロは =!= です。このマクロは受け取った式を *コンパイル時
+に* 計算し、自分自身をその計算結果で置き換えます。たとえば、次の式
+
+#+begin_src emacs-lisp
+  (setq foo (! (+ 1 2)))
+#+end_src
+
+はコンパイルされると
+
+#+begin_src emacs-lisp
+  (setq foo '3)
+#+end_src
+
+なり、実行時に =(+ 1 2)= を計算するよりわずかに速くなります。
+
+コンパイル時計算のもう少し現実的な例を挙げます。
+
+いま、私たちは OS ごとに異なる設定ファイルを読み込みたいと考えていると
+しましょう。これは、たとえば次のように実現することができます。
+
+#+begin_src emacs-lisp
+  ;; Load OS specific settings
+  (case window-system
+    (w32      (setup-include "./init/init-windows.el"))
+    ((ns mac) (setup-include "./init/init-mac.el"))
+    (x        (setup-include "./init/init-linux.el"))
+    (nil      (setup-include "./init/init-term.el")))
+#+end_src
+
+しかし、もしこの設定が Mac で読み込まれるとわかっているのなら、たんに
+次のように書いた方が速いですね。
+
+#+begin_src emacs-lisp
+  (setup-include "./init/init-mac.el")
+#+end_src
+
+setup.el の提供する別のコンパイル時計算マクロ =!case= は、コンパイル時
+に条件分岐を展開してしまうことで実行を高速化します。たとえば、上の設定
+を Mac でコンパイルすれば
+
+#+begin_src emacs-lisp
+  (setup-include "./init/init-mac.el")
+#+end_src
+
+と等価になるし、 Windows でコンパイルすれば
+
+#+begin_src emacs-lisp
+  (setup-include "./init/init-windows.el")
+#+end_src
+
+と等価になります。素敵でしょ？
+
+setup.el は同様の条件分岐マクロをさらに４つ提供します。それぞれ名前か
+ら想像できる通りの挙動をします。
+
+- =!if=
+- =!when=
+- =!unless=
+- =!cond=
+- =!foreach=
+
+** init.el の安全性向上（１） プラグインの存在チェック
+
+セットアップ時に起きるエラーの一つの原因として、読み込もうとしたプラグ
+インがそのシステムにインストールされてないことが挙げられます。このエラー
+を食い止めるために、次のような工夫をすることがあります。
+
+#+begin_src emacs-lisp
+  ;; modify keybinds only when "foo.el" exists
+  (when (locate-library "foo")
+    (global-set-key (kbd "C-x f") 'foo-command))
+
+  ;; "load" does not raise error, and body is evaluated
+  ;; only when "bar.el" is successfully loaded
+  (when (load "bar" t)
+    (bar-set-width 150))
+#+end_src
+
+さて、 =load= の方はさほど問題ありませんが、 =locate-library= はとても
+遅いです。また、いづれにしても見た目がよくないです。つらいです。もう少
+し大きくて現実的な例も見てみましょう。つらいけど。
+
+#+begin_src emacs-lisp
+  ;; -- in init-ace-jump-mode.el
+
+  ;; Add "ace-jump-mode" to the autoload list IF IT EXISTS, and set
+  ;; "ace-jump-mode-end-hook" WHEN IT IS ACTUALLY LOADED.
+  (when (locate-library "ace-jump-mode")
+    (autoload 'ace-jump-word-mode "ace-jump-mode")
+    (eval-after-load "ace-jump-mode"
+      '(add-hook 'ace-jump-mode-end-hook 'recenter)))
+
+  ;; -- in init-key-chord.el
+
+  ;; Load and activate "key-chord-mode" IF IT EXISTS.
+  (when (load "key-chord" t)
+    (key-chord-mode 1))
+
+  ;; -- in init-keybinds.el
+
+  ;; WHEN "key-chord" IS SUCCESSFULLY LOADED AND "ace-jump-mode" EXISTS,
+  ;; add keybinds for "ace-jump-word-mode" via "key-chord".
+  (eval-after-load "key-chord"
+    '(progn
+       ...
+       (when (locate-library "ace-jump-mode")
+         (key-chord-define-global "jl" 'ace-jump-word-mode))
+       ...))
+
+  ;; -- in init-solarized.el
+
+  ;; WHEN "solarized-definitions" EXISTS, load and configure it. In
+  ;; addition, IF "ace-jump-mode" IS SUCCESSFULLY LOADED, do some extra
+  ;; configurations for "ace-jump-mode" via "solarized-definitions".
+  (when (load "solarized-definitions" t)
+    ...
+    (eval-after-load "ace-jump-mode"
+      '(case (frame-parameter nil 'background-mode)
+         (dark (set-face-foreground 'ace-jump-face-foreground
+                                    (! (solarized-find-color 'base3)))
+               (set-face-foreground 'ace-jump-face-background
+                                    (! (solarized-find-color 'base01))))
+         (light (set-face-foreground 'ace-jump-face-foreground
+                                     (! (solarized-find-color 'base03)))
+                (set-face-foreground 'ace-jump-face-background
+                                     (! (solarized-find-color 'base1))))))
+    ...)
+#+end_src
+
+この設定は、基本的には、 ace-jump-mode というプラグインを読み込み設定す
+るものです。加えて、もし key-chord プラグインがインストールされているな
+らば、それを用いてキーバインドを追加します。また、solarized-definition
+がインストールされているならば、それを用いて色の設定を追加します。上の
+設定は、 ace-jump-mode, key-chord, solarized-definition のどれかが欠け
+ていてもエラーを出さずにできるところまで設定をしようと努力してくれる点
+で「安全」です。
+
+setup.el は安全な設定を書くための３つのマクロ =setup=, =setup-after=,
+=setup-expecting= を提供します。これらのマクロを用いて、上の設定を次の
+ように書きなおすことができます。つらみが減りました。
+
+#+begin_src emacs-lisp
+  (setup-lazy '(ace-jump-word-mode) "ace-jump-mode"
+    (add-hook 'ace-jump-mode-end-hook 'recenter))
+
+  (setup "key-chord"
+    (key-chord-mode 1))
+
+  (setup-after "key-chord"
+    ...
+    (setup-expecting "ace-jump-mode"
+      (key-chord-define-global "jl" 'ace-jump-word-mode))
+    ...)
+
+  (setup "solarized-definitions"
+    ...
+    (setup-after "ace-jump-mode"
+      (case (frame-parameter nil 'background-mode)
+        (dark (set-face-foreground 'ace-jump-face-foreground
+                                   (! (solarized-find-color 'base3)))
+              (set-face-foreground 'ace-jump-face-background
+                                   (! (solarized-find-color 'base01))))
+        (light (set-face-foreground 'ace-jump-face-foreground
+                                    (! (solarized-find-color 'base03)))
+               (set-face-foreground 'ace-jump-face-background
+                                    (! (solarized-find-color 'base1))))))
+    ...)
+#+end_src
+
+=setup= はプラグインが存在するかを確認し、もしそうならそのプラグインを
+ロードして、本体を実行します。 =setup-expecting= は =setup= に似ていま
+すが、プラグインの存在を確認するだけでロードはしない点で異なります。
+=setup-after= はプラグインが実際にロードされた場合にだけ実行される設定
+を書くために使うことができます。また、 =autoload= の章で紹介した
+=setup-lazy= マクロも同様にプラグインの存在を確認してから =autoload= し
+てくれます。
+
+これらのマクロは、見た目がつらくないことに加えて、プラグインの存在確認
+を実行時でなく *コンパイル時に行う* 点ですぐれています。これらのマクロ
+によって書かれた「安全」な設定は、事前にコンパイルしてあれば、安全でな
+い設定ファイルとほとんど変わらない速度で実行できます。素敵でしょ？
+
+** init.el の安全性向上（２） 例外処理
+
+セットアップ時に起こるエラーのもう一つの原因として、たんに設定ファイル
+に誤りがある場合があります。自分のミスだから仕方ないといえばそうですが、
+しかし、設定ファイルにエラーがあっても、そこで設定をすべて終わりにして
+しまうのではなくて、できるところまで頑張ってほしいですよね。
+
+そのための一つの方法は、設定をいくつかの小さなブロックに分割して、それ
+ぞれを=ignore-errors= とか =condition-case= とか例外を処理するマクロで
+包んでしまうことです。
+
+#+begin_src emacs-lisp
+  (ignore-errors
+    (foo)
+    (bar)
+    ...)
+
+  (ignore-errors
+    (hoge)
+    (fuga)
+    ...)
+#+end_src
+
+ラッキーなことに、 setup.el を使って書かれた設定はすでにいくつかの小さ
+なブロックに分割されていて、しかもマクロで包まれていますね。 =setup=,
+=setup-include=, =setup-lazy=, =setup-after=, =setup-expecting= のこと
+です。実はこれらのマクロは、プラグインの存在確認その他もろもろの機能に
+加えて、例外処理のためのマクロとしても機能します。これらのマクロの中で
+起こったエラーはその中で処理され、他のマクロの実行に影響を与えません。
+素敵でしょ？
+
+** 使い方
+
+setup.el を load-path の通ったところに置いて、設定ファイルの頭に
+
+: (require 'setup)
+: (setup-initialize)
+
+と書いてください。マクロはすべてコンパイル時に展開されるので、
+
+: (eval-when-compile (require 'setup))
+
+としても構いません（わずかに速くなると思います）が、シンタックスハイラ
+イトがきかなくなるので好みでどうぞ。
