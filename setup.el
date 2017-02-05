@@ -439,7 +439,9 @@ declared."
                          (format "emacs -q -eval \"
  (progn
    (byte-compile-file \\\"%s\\\")
-   (switch-to-buffer \\\"*Compile-Log*\\\")
+   (switch-to-buffer \\\"*Messages*\\\")
+   (read-only-mode -1)
+   (insert \\\"------\n\\\" (with-current-buffer \\\"*Compile-Log*\\\" (buffer-string)))
    (write-region 1 (1+ (buffer-size)) \\\"%s\\\")
    (kill-emacs
      (if (string-match
