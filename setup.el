@@ -418,7 +418,7 @@ declared."
                                    `(lambda () ,@exprs))
                                 oldvalue)))))
 
-(defun setup-byte-compile-file (&optional file)
+(defun setup-byte-compile-file (&optional file cmd)
   "Byte-compile FILE in a clean environment (emacs -q)."
   (interactive)
   (when (and (buffer-modified-p)
@@ -430,13 +430,19 @@ declared."
                       (let* ((absfile (expand-file-name buffer-file-name))
                              (dir (file-name-directory absfile))
                              (file (file-name-nondirectory absfile)))
-                        (read-file-name "File: " dir nil t file)))))
+                        (read-file-name "File: " dir nil t file))))
+        (command (or cmd
+                     (read-string
+                      "Emacs command: "
+                      (if (file-exists-p "/Applications/Emacs.app/Contents/MacOS/Emacs")
+                          "/Applications/Emacs.app/Contents/MacOS/Emacs"
+                        "emacs")))))
     (if (not window-system)
         (shell-command
-         (format "emacs --batch -eval \" (byte-compile-file \\\"%s\\\")\""
-                 filename))
+         (format "%s --batch -eval \" (byte-compile-file \\\"%s\\\")\""
+                 command filename))
       (let ((returncode (shell-command
-                         (format "emacs -q -eval \"
+                         (format "%s -q -eval \"
  (progn
    (byte-compile-file \\\"%s\\\")
    (switch-to-buffer \\\"*Messages*\\\")
@@ -449,7 +455,7 @@ declared."
            (buffer-string))
          1
        0)))\""
-                                 filename tmpfile))))
+                                 command filename tmpfile))))
         (with-current-buffer (get-buffer-create "*Compile-Log*")
           (compilation-mode)
           (let ((buffer-read-only nil))
