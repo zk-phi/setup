@@ -250,11 +250,16 @@ is invoked, if FILE exists."
 (defmacro setup-after (file &rest body)
   "Eval BODY after FILE is loaded."
   (declare (indent defun))
-  (when (locate-library file)
-    `(eval-after-load ,file
-       ',(macroexpand-all
-          `(condition-case err ,(if (cadr body) `(progn ,@body) (car body))
-             (error (message "XX [init] %s: %s" ,file (error-message-string err))))))))
+  (let ((feature (intern file))
+        (libfile (locate-library file)))
+    (when libfile
+      ;; load during compile
+      (when (setup--byte-compiling-p)
+        (or (ignore-errors (require feature nil t)) (load libfile t t)))
+      `(eval-after-load ,file
+         ',(macroexpand-all
+            `(condition-case err ,(if (cadr body) `(progn ,@body) (car body))
+               (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))))
 
 (defmacro setup-expecting (file &rest body)
   "Eval BODY only when FILE exists."
