@@ -189,7 +189,7 @@ instead of loading it."
              (let ((byte-compile-warnings nil))
                (or (ignore-errors (require feature nil t)) (load libfile t t)))
              (setup--declare-defuns body))
-           (let ((history (assoc libfile load-history))
+           (let ((history (load-history-filename-element file))
                  (source (with-temp-buffer
                            (insert-file-contents srcfile)
                            (setup--read-all (current-buffer)))))
