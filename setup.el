@@ -154,7 +154,8 @@ warning message are shown.")
     (cond (libfile
            ;; load during compile to avoid warnings
            (when (setup--byte-compiling-p)
-             (or (ignore-errors (require feature nil t)) (load libfile t t))
+             (let ((byte-compile-warnings nil))
+               (or (ignore-errors (require feature nil t)) (load libfile t t)))
              (setup--declare-defuns body))
            `(let ((beg-time (current-time)))
               ,(if (featurep feature)
@@ -185,7 +186,8 @@ instead of loading it."
     (cond ((and srcfile (file-exists-p srcfile))
            ;; load during compile
            (when (setup--byte-compiling-p)
-             (or (ignore-errors (require feature nil t)) (load libfile t t))
+             (let ((byte-compile-warnings nil))
+               (or (ignore-errors (require feature nil t)) (load libfile t t)))
              (setup--declare-defuns body))
            (let ((history (assoc libfile load-history))
                  (source (with-temp-buffer
@@ -236,7 +238,8 @@ is invoked, if FILE exists."
            ;; load during compile
            (when (setup--byte-compiling-p)
              (eval preparation)
-             (or (ignore-errors (require (intern file) nil t)) (load file t t))
+             (let ((byte-compile-warnings nil))
+               (or (ignore-errors (require (intern file) nil t)) (load file t t)))
              (setup--declare-defuns body))
            `(progn
               ,@(mapcar (lambda (trigger)
@@ -266,7 +269,8 @@ is invoked, if FILE exists."
     (when libfile
       ;; load during compile
       (when (setup--byte-compiling-p)
-        (or (ignore-errors (require feature nil t)) (load libfile t t))
+        (let ((byte-compile-warnings nil))
+          (or (ignore-errors (require feature nil t)) (load libfile t t)))
         (setup--declare-defuns body))
       `(eval-after-load ,file
          ',(macroexpand-all
@@ -294,7 +298,8 @@ is invoked, if FILE exists."
            (libfile (locate-library file)))
       ;; load during compile
       (when (setup--byte-compiling-p)
-        (or (ignore-errors (require feature nil t)) (load libfile t t)))
+        (let ((byte-compile-warnings nil))
+          (or (ignore-errors (require feature nil t)) (load libfile t t))))
       `(run-with-idle-timer ,setup-idle-threshold nil
                             (lambda ()
                               ,(if (featurep feature)
