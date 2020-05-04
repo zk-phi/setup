@@ -455,6 +455,14 @@ efficient init scripts cleanly.
   (!- (my-clean-old-backups))
 #+end_src
 
+*** =setup-silently=
+
+#+begin_src emacs-lisp
+  ;; suppress messages for performance
+  (setup-silently
+   (key-chord-mode 1))   ; the message "Key Chord mode on" is suppressed
+#+end_src
+
 *** =M-x setup-byte-compile-file=
 
 Byte-compile current buffer in a clean (=emacs -q=) environment.

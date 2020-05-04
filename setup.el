@@ -99,6 +99,16 @@ loading libraries.")
 
 ;; + initialize
 
+(defmacro setup-silently (&rest body)
+  "Eval body without messages"
+  `(let ((original-message-fn (symbol-function 'message)))
+     ;; why is "flet" obsolete ?
+     (unwind-protect
+         (progn
+           (fset 'message (lambda (&rest _) nil))
+           ,@body)
+       (fset 'message original-message-fn))))
+
 (defmacro setup-initialize ()
   "This macro is replaced with an initializing routine when expanded.
 *PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT.*"
@@ -115,12 +125,8 @@ loading libraries.")
                                    (lambda ()
                                      (if setup--delay-queue
                                          ,(if setup-delay-silent
-                                              ;; why is "flet" obsolete ?
-                                              `(unwind-protect
-                                                   (progn
-                                                     (fset 'message (lambda (&rest _) nil))
-                                                     (eval (pop setup--delay-queue)))
-                                                 (fset 'message setup--original-message-fn))
+                                              `(setup-silently
+                                                (eval (pop setup--delay-queue)))
                                             `(eval (pop setup--delay-queue)))
                                        (message ">> [init] all delayed setup completed.")
                                        (cancel-timer setup--delay-timer-object)))))
