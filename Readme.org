@@ -480,6 +480,7 @@ macros.
 
 Customizable variables are :
 
+- =setup-silent=
 - =setup-include-allow-runtime-load=
 - =setup-environ-warning-alist=
 - =setup-delay-interval=

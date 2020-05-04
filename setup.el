@@ -77,6 +77,10 @@ warning message are shown.")
 (defvar setup-delay-interval 0.1
   "Delay for delayed setup `!-'.")
 
+(defvar setup-silent nil
+  "When non-nil, setup and setup-include does not message after
+loading libraries.")
+
 (defvar setup-delay-silent nil
   "When non-nil, delayed setup does not message.")
 
@@ -157,17 +161,18 @@ warning message are shown.")
              (let ((byte-compile-warnings nil))
                (or (ignore-errors (require feature nil t)) (load libfile t t)))
              (setup--declare-defuns body))
-           `(let ((beg-time (current-time)))
+           `(let ((beg-time ,(unless setup-silent '(current-time))))
               ,(if (featurep feature)
                    `(unless (featurep ',feature)
                       (load ,libfile t t))
                  `(load ,libfile t t))
               (condition-case err
                   (progn ,@body
-                         (message ">> [init] %s: loaded in %d msec" ,file
-                                  (let ((now (current-time)))
-                                    (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
-                                       (/ (- (nth 2 now) (nth 2 beg-time)) 1000)))))
+                         ,(unless setup-silent
+                            `(message ">> [init] %s: loaded in %d msec" ,file
+                                      (let ((now (current-time)))
+                                        (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
+                                           (/ (- (nth 2 now) (nth 2 beg-time)) 1000))))))
                 (error (message "XX [init] %s: %s" ,file (error-message-string err))))))
           (t
            (byte-compile-warn "%s not found" file)
@@ -193,7 +198,7 @@ instead of loading it."
                  (source (with-temp-buffer
                            (insert-file-contents srcfile)
                            (setup--read-all (current-buffer)))))
-             `(let ((beg-time (current-time)))
+             `(let ((beg-time ,(unless setup-silent '(current-time))))
                 (unless (featurep ',feature)
                   ;; The author of .emacs considered not responsible
                   ;; for the warnings in included libraries
@@ -208,10 +213,11 @@ instead of loading it."
                   (do-after-load-evaluation ,libfile))
                 (condition-case err
                     (progn ,@body
-                           (message ">> [init] %s: loaded in %d msec" ,file
-                                    (let ((now (current-time)))
-                                      (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
-                                         (/ (- (nth 2 now) (nth 2 beg-time)) 1000)))))
+                           ,(unless setup-silent
+                              `(message ">> [init] %s: loaded in %d msec" ,file
+                                        (let ((now (current-time)))
+                                          (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
+                                             (/ (- (nth 2 now) (nth 2 beg-time)) 1000))))))
                   (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))
           ((and libfile
                 (or (not (setup--byte-compiling-p))
@@ -253,7 +259,7 @@ is invoked, if FILE exists."
                 ',(macroexpand-all
                    `(condition-case err
                         (progn ,@body
-                               (message "<< [init] %s: loaded" ,file))
+                               ,(unless setup-silent `(message "<< [init] %s: loaded" ,file)))
                       (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))))
         (t
          (byte-compile-warn "%s not found" file)
