@@ -416,31 +416,65 @@ efficient init scripts cleanly.
 
 *** =setup-in-idle=
 
+#+begin_src emacs-lisp
+  ;; load foo on-demand
+  (setup-lazy '(foo-command) "foo")
+  ;; load foo eagerly if emacs is idle
+  (setup-in-idle "foo")
+#+end_src
+
 *** =setup-keybinds=
+
+#+begin_src emacs-lisp
+  (setup-keybinds nil
+    "C-l" 'recenter
+    ;; bind pager commands iff the "pager" library exists.
+    ;; otherwise use built-in scroll commands.
+    "C-u" '("pager" pager-page-up scroll-down)
+    "C-v" '("pager" pager-page-down scroll-up))
+
+  ;; specify keymap name to modify local keybinds
+  (setup-keybinds Buffer-menu-mode-map
+    "RET" 'Buffer-menu-select
+    "SPC" 'Buffer-menu-delete
+    "d"   'Buffer-menu-execute)
+#+end_src
 
 *** =setup-hook=
 
+#+begin_src emacs-lisp
+  ;; writing hooks without "lambda"s. that's it
+  (setup-hook 'eshell-mode-hook
+    (setq eshell-last-command-status 0))
+#+end_src
+
+*** =!-=
+
+#+begin_src emacs-lisp
+  ;; clean old backups (pseudo-)ASYNCHRONOUSLY
+  (!- (my-clean-old-backups))
+#+end_src
+
+*** =M-x setup-byte-compile-file=
+
+Byte-compile current buffer in a clean (=emacs -q=) environment.
+
 ** Installation
 
-Put "setup.el" into load-path, then require and initialize this script
+Put "setup.el" into load-path, then require and initialize
 
 : (require 'setup)
 : (setup-initialize)
 
-at the beginning of your init script. And compile it by "M-x
-byte-compile-file".
+at the beginning of your init script.
 
 Macros are all expanded in compile-time, thus requiring this script
-only during compile is also OK. This may slightly improves
-performance, but lacks highlighting for macros.
+only when compile is also OK.
 
 : (eval-when-compile (require 'setup))
 
-Defined macros are :
-
-- =!=, =!if=, =!when=, =!unless=, =!case=, =!cond=
-- =setup=, =setup-include=, =setup-lazy=, =setup-after=
-- =setup-in-idle=, =setup-keybinds=
+This may slightly improves performance, but lacks highlighting for
+macros.
 
 ** Customization
 
@@ -448,6 +482,14 @@ Customizable variables are :
 
 - =setup-include-allow-runtime-load=
 - =setup-environ-warning-alist=
+- =setup-delay-interval=
+- =setup-delay-silent=
+- =setup-idle-threshold=
 
 NOTE: Make sure that they are set *during compile* (with
-"eval-when-compile")
+=eval-when-compile=)
+
+#+begin_src emacs-lisp
+  (eval-when-compile
+    (setq setup-idle-threshold 10))
+#+end_src
