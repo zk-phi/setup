@@ -98,6 +98,7 @@ warning message are shown.")
   "This macro is replaced with an initializing routine when expanded.
 *PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT.*"
   `(progn
+     (defconst setup-last-compiled-time ,(format-time-string "%D %T"))
      ;; setup stopwatch
      (defconst setup--start-time (current-time))
      (defconst setup--original-message-fn (symbol-function 'message))
