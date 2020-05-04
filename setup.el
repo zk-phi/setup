@@ -18,7 +18,7 @@
 
 ;; Author: zk_phi
 ;; URL: http://hins11.yu-yake.com/
-;; Version: 1.0.3
+;; Version: 1.0.4
 
 ;;; Commentary:
 
@@ -44,6 +44,7 @@
 ;; 1.0.1 add setup-hook macro
 ;; 1.0.2 change anaphoric macros' API
 ;; 1.0.3 add delayed execution "!-"
+;; 1.0.4 Fix minor bugs
 
 ;;; Code:
 
