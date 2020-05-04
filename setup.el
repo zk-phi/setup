@@ -146,7 +146,7 @@ warning message are shown.")
     (cond (libfile
            ;; load during compile to avoid warnings
            (when (setup--byte-compiling-p)
-             (or (require feature nil t) (load libfile t t)))
+             (or (ignore-errors (require feature nil t)) (load libfile t t)))
            `(let ((beg-time (current-time)))
               ,(if (featurep feature)
                    `(unless (featurep ',feature)
@@ -176,7 +176,7 @@ instead of loading it."
     (cond ((and srcfile (file-exists-p srcfile))
            ;; load during compile
            (when (setup--byte-compiling-p)
-             (or (require feature nil t) (load libfile t t)))
+             (or (ignore-errors (require feature nil t)) (load libfile t t)))
            (let ((history (assoc libfile load-history))
                  (source (with-temp-buffer
                            (insert-file-contents srcfile)
@@ -226,7 +226,7 @@ is invoked, if FILE exists."
            ;; load during compile
            (when (setup--byte-compiling-p)
              (eval preparation)
-             (or (require (intern file) nil t) (load file t t)))
+             (or (ignore-errors (require (intern file) nil t)) (load file t t)))
            `(progn
               ,@(mapcar (lambda (trigger)
                           `(autoload ',trigger ,file nil t))
@@ -275,7 +275,7 @@ is invoked, if FILE exists."
            (libfile (locate-library file)))
       ;; load during compile
       (when (setup--byte-compiling-p)
-        (or (require feature nil t) (load libfile t t)))
+        (or (ignore-errors (require feature nil t)) (load libfile t t)))
       `(run-with-idle-timer ,setup-idle-threshold nil
                             (lambda ()
                               ,(if (featurep feature)
