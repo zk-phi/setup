@@ -18,7 +18,7 @@
 
 ;; Author: zk_phi
 ;; URL: http://zk-phi.github.io/
-;; Version: 1.0.4
+;; Version: 1.0.5
 
 ;;; Commentary:
 
@@ -45,6 +45,7 @@
 ;; 1.0.2 change anaphoric macros' API
 ;; 1.0.3 add delayed execution "!-"
 ;; 1.0.4 Fix minor bugs
+;; 1.0.5 add option setup-silent and macro setup-silently
 
 ;;; Code:
 
