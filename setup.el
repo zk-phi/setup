@@ -139,6 +139,13 @@ warning message are shown.")
   (and (boundp 'byte-compile-current-file)
        byte-compile-current-file))
 
+(defun setup--declare-defuns (body)
+  "Declare symbols defun-ed in the forms BODY, to avoid
+`undefined function` warnings."
+  (dolist (form body)
+    (when (eq (car form) 'defun)
+      (defalias (cadr form) `(lambda ,(cl-caddr form) nil)))))
+
 (defmacro setup (file &rest body)
   "Load FILE and evaluate BODY, iff FILE exists."
   (declare (indent defun))
@@ -147,7 +154,8 @@ warning message are shown.")
     (cond (libfile
            ;; load during compile to avoid warnings
            (when (setup--byte-compiling-p)
-             (or (ignore-errors (require feature nil t)) (load libfile t t)))
+             (or (ignore-errors (require feature nil t)) (load libfile t t))
+             (setup--declare-defuns body))
            `(let ((beg-time (current-time)))
               ,(if (featurep feature)
                    `(unless (featurep ',feature)
@@ -177,7 +185,8 @@ instead of loading it."
     (cond ((and srcfile (file-exists-p srcfile))
            ;; load during compile
            (when (setup--byte-compiling-p)
-             (or (ignore-errors (require feature nil t)) (load libfile t t)))
+             (or (ignore-errors (require feature nil t)) (load libfile t t))
+             (setup--declare-defuns body))
            (let ((history (assoc libfile load-history))
                  (source (with-temp-buffer
                            (insert-file-contents srcfile)
@@ -227,7 +236,8 @@ is invoked, if FILE exists."
            ;; load during compile
            (when (setup--byte-compiling-p)
              (eval preparation)
-             (or (ignore-errors (require (intern file) nil t)) (load file t t)))
+             (or (ignore-errors (require (intern file) nil t)) (load file t t))
+             (setup--declare-defuns body))
            `(progn
               ,@(mapcar (lambda (trigger)
                           `(autoload ',trigger ,file nil t))
@@ -256,7 +266,8 @@ is invoked, if FILE exists."
     (when libfile
       ;; load during compile
       (when (setup--byte-compiling-p)
-        (or (ignore-errors (require feature nil t)) (load libfile t t)))
+        (or (ignore-errors (require feature nil t)) (load libfile t t))
+        (setup--declare-defuns body))
       `(eval-after-load ,file
          ',(macroexpand-all
             `(condition-case err ,(if (cadr body) `(progn ,@body) (car body))
@@ -268,6 +279,8 @@ is invoked, if FILE exists."
   (cond ((locate-library file)
          (when (eq (car body) :fallback)
            (setq body (cddr body)))
+         (when (setup--byte-compiling-p)
+           (setup--declare-defuns body))
          `(condition-case err ,(if (cadr body) `(progn ,@body) (car body))
             (error (message "XX [init] %s: %s" ,file (error-message-string err)))))
         ((eq (car body) :fallback)
