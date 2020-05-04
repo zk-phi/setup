@@ -85,6 +85,9 @@ loading libraries.")
 (defvar setup-delay-silent nil
   "When non-nil, delayed setup does not message.")
 
+(defvar setup-use-profiler nil
+  "When non-nil, profile setup time and report after init.")
+
 (defvar setup-idle-threshold 13
   "Idle time threshold in seconds to invoke `setup-in-idle'.")
 
@@ -119,6 +122,10 @@ loading libraries.")
      (defconst setup--start-time (current-time))
      (defconst setup--original-message-fn (symbol-function 'message))
      (defvar setup--delay-queue nil)
+     ;; setup profiler
+     ,@(when setup-use-profiler
+         '((require 'profiler)
+           (profiler-start 'cpu)))
      (add-hook 'after-init-hook
                (lambda  ()
                  (defconst setup--delay-timer-object
@@ -134,7 +141,10 @@ loading libraries.")
                  (message ">> [init] TOTAL: %d msec"
                           (let ((now (current-time)))
                             (+ (* (- (nth 1 now) (nth 1 setup--start-time)) 1000)
-                               (/ (- (nth 2 now) (nth 2 setup--start-time)) 1000))))))
+                               (/ (- (nth 2 now) (nth 2 setup--start-time)) 1000))))
+                 ,@(when setup-use-profiler
+                     '((profiler-report)
+                       (profiler-stop)))))
      ;; check and warn about environ
      (unless (and ,@(mapcar (lambda (pair)
                               `(or (equal ',(eval (car pair)) ,(car pair))
