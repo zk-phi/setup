@@ -453,6 +453,9 @@ efficient init scripts cleanly.
 #+begin_src emacs-lisp
   ;; clean old backups (pseudo-)ASYNCHRONOUSLY
   (!- (my-clean-old-backups))
+
+  ;; take precedence when annotated with ":prepend"
+  (!- :prepend (my-decorate-user-interface))
 #+end_src
 
 *** =setup-silently=

@@ -122,12 +122,14 @@ loading libraries.")
      (defconst setup--start-time (current-time))
      (defconst setup--original-message-fn (symbol-function 'message))
      (defvar setup--delay-queue nil)
+     (defvar setup--delay-priority-queue nil)
      ;; setup profiler
      ,@(when setup-use-profiler
          '((require 'profiler)
            (profiler-start 'cpu)))
      (add-hook 'after-init-hook
                (lambda  ()
+                 (setq setup--delay-queue (nconc setup--delay-priority-queue setup--delay-queue))
                  (defconst setup--delay-timer-object
                    (run-with-timer ,setup-delay-interval ,setup-delay-interval
                                    (lambda ()
@@ -407,8 +409,10 @@ is invoked, if FILE exists."
 (defmacro !- (&rest body)
   "Eval BODY when Emacs started up with slight delay. This works
 like a pseudo asynchronous process."
-  `(push ',(macroexpand-all (if (cadr body) `(progn ,@body) (car body)))
-         setup--delay-queue))
+  (let ((form (macroexpand-all (if (cadr body) `(progn ,@body) (car body)))))
+    (if (eq (car body) :prepend)
+        `(push ',form setup--delay-priority-queue)
+      `(push ',form setup--delay-queue))))
 
 ;; + other utilities
 
