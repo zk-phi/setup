@@ -466,6 +466,23 @@ efficient init scripts cleanly.
    (key-chord-mode 1))   ; the message "Key Chord mode on" is suppressed
 #+end_src
 
+*** =setup-with-delayed-redisplay=
+
+#+begin_src emacs-lisp
+  ;; suppress redisplay for performance
+  (setup-with-delayed-redisplay
+   (mini-modeline-mode 1))
+#+end_src
+
+*** =setup-fallback=
+
+#+begin_src emacs-lisp
+  ;; equivalent to
+  ;; (setup-expecting "foo-package" :fallback (progn ...))
+  (setup-fallback "foo-package"
+    ...)
+#+end_src
+
 *** =M-x setup-byte-compile-file=
 
 Byte-compile current buffer in a clean (=emacs -q=) environment.
