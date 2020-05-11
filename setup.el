@@ -18,7 +18,7 @@
 
 ;; Author: zk_phi
 ;; URL: http://zk-phi.github.io/
-;; Version: 1.0.5
+;; Version: 1.0.6
 
 ;;; Commentary:
 
@@ -46,6 +46,7 @@
 ;; 1.0.3 add delayed execution "!-"
 ;; 1.0.4 Fix minor bugs
 ;; 1.0.5 add option setup-silent and macro setup-silently
+;; 1.0.6 add macro setup-fallback and setup-with-delayed-redisplay
 
 ;;; Code:
 
@@ -53,7 +54,7 @@
 (require 'macroexp)     ; macroexpand-all
 (require 'bytecomp)     ; byte-compile-current-file, byte-compile-warn
 
-(defconst setup-version "1.0.3")
+(defconst setup-version "1.0.6")
 
 ;; + customizable vars
 
