@@ -483,6 +483,17 @@ efficient init scripts cleanly.
     ...)
 #+end_src
 
+*** =(setq setup-use-profiler t)= (for debugging use)
+
+Enable profiler during startup process and report when finished.
+
+*** =setup-simulate-absense=
+
+#+begin_src emacs-lisp
+  ;; Compile as if the foo-package is not installed
+  (setup-simulate-absense "foo-package")
+#+end_src
+
 *** =M-x setup-byte-compile-file=
 
 Byte-compile current buffer in a clean (=emacs -q=) environment.
