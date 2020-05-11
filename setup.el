@@ -302,6 +302,15 @@ is invoked, if FILE exists."
             `(condition-case err ,(if (cadr body) `(progn ,@body) (car body))
                (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))))
 
+(defmacro setup-fallback (file &rest body)
+  "Eval BODY only when FILE does not exist."
+  (declare (indent defun))
+  (unless (locate-library file)
+    (when (setup--byte-compiling-p)
+      (setup--declare-defuns body))
+    `(condition-case err ,(if (cadr body) `(progn ,@body) (car body))
+       (error (message "XX [init] %s" (error-message-string err))))))
+
 (defmacro setup-expecting (file &rest body)
   "Eval BODY only when FILE exists."
   (declare (indent defun))
