@@ -167,6 +167,11 @@ loading libraries.")
 
 ;; + load and configure libraries
 
+(defvar setup--simulated-absent-libraries nil)
+(defun setup--locate-library (file)
+  (and (not (member file setup--simulated-absent-libraries))
+       (locate-library file)))
+
 (defun setup--byte-compiling-p ()
   "Return non-nil iff byte-compile is in progress."
   (and (boundp 'byte-compile-current-file)
@@ -183,7 +188,7 @@ loading libraries.")
   "Load FILE and evaluate BODY, iff FILE exists."
   (declare (indent defun))
   (let ((feature (intern file))
-        (libfile (locate-library file)))
+        (libfile (setup--locate-library file)))
     (cond (libfile
            ;; load during compile to avoid warnings
            (when (setup--byte-compiling-p)
@@ -213,10 +218,11 @@ loading libraries.")
   "Like `setup', but includes FILE to the compiled init script
 instead of loading it."
   (declare (indent 1))
-  (let ((feature (intern file))         ; string->symbol
-        (libfile (locate-library file))
-        (srcfile (or (ignore-errors (find-library-name file))
-                     (expand-file-name file))))
+  (let* ((feature (intern file))         ; string->symbol
+         (libfile (setup--locate-library file))
+         (srcfile (and libfile
+                       (or (ignore-errors (find-library-name file))
+                           (expand-file-name file)))))
     (cond ((and srcfile (file-exists-p srcfile))
            ;; load during compile
            (when (setup--byte-compiling-p)
@@ -266,7 +272,7 @@ instead of loading it."
   "Load FILE and evaluate BODY when a function listed in TRIGGERS
 is invoked, if FILE exists."
   (declare (indent defun))
-  (cond ((locate-library file)
+  (cond ((setup--locate-library file)
          (let ((triggers (eval triggers))
                (preparation (when (and body (eq (car body) :prepare))
                               (prog1 (cadr body) (setq body (cddr body))))))
@@ -300,7 +306,7 @@ is invoked, if FILE exists."
   "Eval BODY after FILE is loaded."
   (declare (indent defun))
   (let ((feature (intern file))
-        (libfile (locate-library file)))
+        (libfile (setup--locate-library file)))
     (when libfile
       ;; load during compile
       (when (setup--byte-compiling-p)
@@ -315,7 +321,7 @@ is invoked, if FILE exists."
 (defmacro setup-fallback (file &rest body)
   "Eval BODY only when FILE does not exist."
   (declare (indent defun))
-  (unless (locate-library file)
+  (unless (setup--locate-library file)
     (when (setup--byte-compiling-p)
       (setup--declare-defuns body))
     `(condition-case err ,(if (cadr body) `(progn ,@body) (car body))
@@ -324,7 +330,7 @@ is invoked, if FILE exists."
 (defmacro setup-expecting (file &rest body)
   "Eval BODY only when FILE exists."
   (declare (indent defun))
-  (cond ((locate-library file)
+  (cond ((setup--locate-library file)
          (when (eq (car body) :fallback)
            (setq body (cddr body)))
          (when (setup--byte-compiling-p)
@@ -339,9 +345,9 @@ is invoked, if FILE exists."
 
 (defmacro setup-in-idle (file)
   "Load FILE during idle-time."
-  (when (locate-library file)
-    (let* ((feature (intern file))
-           (libfile (locate-library file)))
+  (let* ((feature (intern file))
+         (libfile (setup--locate-library file)))
+    (when libfile
       ;; load during compile
       (when (setup--byte-compiling-p)
         (let ((byte-compile-warnings nil))
@@ -456,7 +462,7 @@ or ELSECOMMAND otherwise."
                  (def (eval (cdr bind)))
                  (command (cond ((not (and (listp def) (stringp (car def))))
                                  `',def)
-                                ((locate-library (car def))
+                                ((setup--locate-library (car def))
                                  `',(cadr def))
                                 (t
                                  `',(or (nth 2 def) 'ignore)))))
@@ -537,6 +543,12 @@ declared."
           (goto-char (point-max)))
         (unless (zerop returncode)
           (display-buffer "*Compile-Log*"))))))
+
+;; + debugging utils
+
+(defmacro setup-simulate-absense (file)
+  (push file setup--simulated-absent-libraries)
+  nil)
 
 ;; + (provide)
 
