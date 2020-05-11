@@ -313,6 +313,8 @@ is invoked, if FILE exists."
          `(condition-case err ,(if (cadr body) `(progn ,@body) (car body))
             (error (message "XX [init] %s: %s" ,file (error-message-string err)))))
         ((eq (car body) :fallback)
+         (when (setup--byte-compiling-p)
+           (setup--declare-defuns (list (cadr body))))
          `(condition-case err ,(cadr body)
             (error (message "XX [init] %s" (error-message-string err)))))))
 
