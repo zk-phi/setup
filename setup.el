@@ -103,6 +103,15 @@ loading libraries.")
 
 ;; + initialize
 
+(defmacro setup-with-delayed-redisplay (&rest body)
+  `(let ((original-redisplay-fn (symbol-function 'redisplay)))
+     ;; why is "flet" obsolete ?
+     (unwind-protect
+         (progn
+           (fset 'redisplay (lambda (&rest _) nil))
+           ,@body)
+       (fset 'redisplay original-redisplay-fn))))
+
 (defmacro setup-silently (&rest body)
   "Eval body without messages"
   `(let ((original-message-fn (symbol-function 'message)))
