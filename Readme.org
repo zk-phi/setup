@@ -507,8 +507,8 @@ Put "setup.el" into load-path, then require and initialize
 
 at the beginning of your init script.
 
-Macros are all expanded in compile-time, thus requiring this script
-only when compile is also OK.
+All macros are expanded during compile, thus =setup.el= is not
+required during runtime actually.
 
 : (eval-when-compile (require 'setup))
 
