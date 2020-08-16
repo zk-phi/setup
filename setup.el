@@ -122,13 +122,8 @@ startup for performance.")
 
 (defmacro setup-silently (&rest body)
   "Eval body without messages"
-  `(let ((original-message-fn (symbol-function 'message)))
-     ;; why is "flet" obsolete ?
-     (unwind-protect
-         (progn
-           (fset 'message (lambda (&rest _) nil))
-           ,@body)
-       (fset 'message original-message-fn))))
+  `(let ((inhibit-message t))
+     ,@body))
 
 (defmacro setup-initialize ()
   "This macro is replaced with an initializing routine when expanded.
