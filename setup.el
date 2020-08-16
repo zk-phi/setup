@@ -93,6 +93,9 @@ loading libraries.")
   "When non-nil, file-name-handler-alist is set nil during
 startup for performance.")
 
+(defvar setup-enable-gc-threshold-hacks nil
+  "When non-nil, enlarge gc-threshold during startup.")
+
 (defvar setup-idle-threshold 13
   "Idle time threshold in seconds to invoke `setup-in-idle'.")
 
@@ -161,7 +164,11 @@ startup for performance.")
                                        (message ">> [init] all delayed setup completed.")
                                        (cancel-timer setup--delay-timer-object)))))
                  ,(when setup-disable-magic-file-name
-                    `(setq file-name-handler-alist ',file-name-handler-alist))
+                    `(unless file-name-handler-alist
+                       (setq file-name-handler-alist ',file-name-handler-alist)))
+                 ,(when setup-enable-gc-threshold-hacks
+                    '(setq gc-cons-threshold  16777216 ; 16mb
+                           gc-cons-percentage 0.1))
                  ,@(when setup-use-profiler
                      '((profiler-report)
                        (profiler-stop)))
@@ -169,6 +176,9 @@ startup for performance.")
                           (let ((now (current-time)))
                             (+ (* (- (nth 1 now) (nth 1 setup--start-time)) 1000)
                                (/ (- (nth 2 now) (nth 2 setup--start-time)) 1000))))))
+     ,(when setup-enable-gc-threshold-hacks
+        '(setq gc-cons-threshold  most-positive-fixnum
+               gc-cons-percentage 0.6))
      ,(when setup-disable-magic-file-name
         '(setq file-name-handler-alist nil))))
 
