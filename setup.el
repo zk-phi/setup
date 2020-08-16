@@ -199,7 +199,7 @@ startup for performance.")
 `undefined function` warnings."
   (dolist (form body)
     (when (eq (car form) 'defun)
-      (defalias (cadr form) `(lambda ,(cl-caddr form) nil)))))
+      (defalias (cadr form) `(lambda ,(caddr form) nil)))))
 
 (defmacro setup (file &rest body)
   "Load FILE and evaluate BODY, iff FILE exists."
