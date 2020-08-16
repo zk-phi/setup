@@ -89,6 +89,10 @@ loading libraries.")
 (defvar setup-use-profiler nil
   "When non-nil, profile setup time and report after init.")
 
+(defvar setup-disable-magic-file-name nil
+  "When non-nil, file-name-handler-alist is set nil during
+startup for performance.")
+
 (defvar setup-idle-threshold 13
   "Idle time threshold in seconds to invoke `setup-in-idle'.")
 
@@ -154,6 +158,8 @@ loading libraries.")
                           (let ((now (current-time)))
                             (+ (* (- (nth 1 now) (nth 1 setup--start-time)) 1000)
                                (/ (- (nth 2 now) (nth 2 setup--start-time)) 1000))))
+                 ,(when setup-disable-magic-file-name
+                    `(setq file-name-handler-alist ',file-name-handler-alist))
                  ,@(when setup-use-profiler
                      '((profiler-report)
                        (profiler-stop)))))
@@ -163,7 +169,9 @@ loading libraries.")
                                    (y-or-n-p
                                     ,(concat (cdr pair) " Really continue ? "))))
                             setup-environ-warning-alist))
-       (error "Setup canceled."))))
+       (error "Setup canceled."))
+     ,(when setup-disable-magic-file-name
+        '(setq file-name-handler-alist nil))))
 
 ;; + load and configure libraries
 
