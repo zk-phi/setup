@@ -79,6 +79,14 @@ warning message are shown.")
 (defvar setup-delay-interval 0.1
   "Delay for delayed setup `!-'.")
 
+(defvar setup-delay-with-threads nil
+  "When non-nil, delayed setup is evaluated with threads, instead
+of run-with-idle-timer. This may break setup process if it's not
+thread-safe.
+
+This is an experimental feature and interface may change in
+future versions.")
+
 (defvar setup-silent nil
   "When non-nil, setup and setup-include does not message after
 loading libraries.")
@@ -148,13 +156,21 @@ startup for performance.")
      (add-hook 'after-init-hook
                (lambda  ()
                  (setq setup--delay-queue (nconc setup--delay-priority-queue setup--delay-queue))
-                 (defconst setup--delay-timer-object
-                   (run-with-timer ,setup-delay-interval ,setup-delay-interval
-                                   (lambda ()
-                                     (if setup--delay-queue
-                                         (eval (pop setup--delay-queue))
-                                       (message ">> [init] all delayed setup completed.")
-                                       (cancel-timer setup--delay-timer-object)))))
+                 ,(unless setup-delay-with-threads
+                    `(defconst setup--delay-timer-object
+                       (run-with-timer ,setup-delay-interval ,setup-delay-interval
+                                       (lambda ()
+                                         (if setup--delay-queue
+                                             (eval (pop setup--delay-queue))
+                                           (message ">> [init] all delayed setup completed.")
+                                           (cancel-timer setup--delay-timer-object))))))
+                 ,(when setup-delay-with-threads
+                    '(make-thread
+                      (lambda ()
+                        (while setup--delay-queue
+                          (thread-yield)
+                          (eval (pop setup--delay-queue)))
+                        (message ">> [init] all delayed setup completed."))))
                  ,(when setup-disable-magic-file-name
                     `(unless file-name-handler-alist
                        (setq file-name-handler-alist ',file-name-handler-alist)))
