@@ -136,6 +136,13 @@ startup for performance.")
      (defconst setup--start-time (current-time))
      (defvar setup--delay-queue nil)
      (defvar setup--delay-priority-queue nil)
+     ;; check and warn about environ
+     (unless (and ,@(mapcar (lambda (pair)
+                              `(or (equal ',(eval (car pair)) ,(car pair))
+                                   (y-or-n-p
+                                    ,(concat (cdr pair) " Really continue ? "))))
+                            setup-environ-warning-alist))
+       (error "Setup canceled."))
      ;; setup profiler
      ,@(when setup-use-profiler
          '((require 'profiler)
@@ -153,22 +160,15 @@ startup for performance.")
                                             `(eval (pop setup--delay-queue)))
                                        (message ">> [init] all delayed setup completed.")
                                        (cancel-timer setup--delay-timer-object)))))
-                 (message ">> [init] TOTAL: %d msec"
-                          (let ((now (current-time)))
-                            (+ (* (- (nth 1 now) (nth 1 setup--start-time)) 1000)
-                               (/ (- (nth 2 now) (nth 2 setup--start-time)) 1000))))
                  ,(when setup-disable-magic-file-name
                     `(setq file-name-handler-alist ',file-name-handler-alist))
                  ,@(when setup-use-profiler
                      '((profiler-report)
-                       (profiler-stop)))))
-     ;; check and warn about environ
-     (unless (and ,@(mapcar (lambda (pair)
-                              `(or (equal ',(eval (car pair)) ,(car pair))
-                                   (y-or-n-p
-                                    ,(concat (cdr pair) " Really continue ? "))))
-                            setup-environ-warning-alist))
-       (error "Setup canceled."))
+                       (profiler-stop)))
+                 (message ">> [init] TOTAL: %d msec"
+                          (let ((now (current-time)))
+                            (+ (* (- (nth 1 now) (nth 1 setup--start-time)) 1000)
+                               (/ (- (nth 2 now) (nth 2 setup--start-time)) 1000))))))
      ,(when setup-disable-magic-file-name
         '(setq file-name-handler-alist nil))))
 
