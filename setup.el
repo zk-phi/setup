@@ -152,10 +152,7 @@ startup for performance.")
                    (run-with-timer ,setup-delay-interval ,setup-delay-interval
                                    (lambda ()
                                      (if setup--delay-queue
-                                         ,(if setup-delay-silent
-                                              `(setup-silently
-                                                (eval (pop setup--delay-queue)))
-                                            `(eval (pop setup--delay-queue)))
+                                         (eval (pop setup--delay-queue))
                                        (message ">> [init] all delayed setup completed.")
                                        (cancel-timer setup--delay-timer-object)))))
                  ,(when setup-disable-magic-file-name
@@ -448,10 +445,18 @@ is invoked, if FILE exists."
 (defmacro !- (&rest body)
   "Eval BODY when Emacs started up with slight delay. This works
 like a pseudo asynchronous process."
-  (let ((form (macroexpand-all (if (cadr body) `(progn ,@body) (car body)))))
-    (if (eq (car body) :prepend)
-        `(push ',form setup--delay-priority-queue)
-      `(push ',form setup--delay-queue))))
+  (let* ((place (cond ((eq (car body) :prepend)
+                       (pop body)
+                       'setup--delay-priority-queue)
+                      (t
+                       'setup--delay-queue)))
+         (form (cond (setup-delay-silent
+                      `(let ((inhibit-message t)) ,@body))
+                     ((cadr body)
+                      `(progn ,@body))
+                     (t
+                      (car body)))))
+    `(push ',(macroexpand-all form) ,place)))
 
 ;; + other utilities
 
