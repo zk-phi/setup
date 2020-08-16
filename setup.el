@@ -134,7 +134,6 @@ startup for performance.")
      (defconst setup-last-compiled-time ,(format-time-string "%D %T"))
      ;; setup stopwatch
      (defconst setup--start-time (current-time))
-     (defconst setup--original-message-fn (symbol-function 'message))
      (defvar setup--delay-queue nil)
      (defvar setup--delay-priority-queue nil)
      ;; setup profiler
