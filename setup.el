@@ -158,19 +158,21 @@ startup for performance.")
                  (setq setup--delay-queue (nconc setup--delay-priority-queue setup--delay-queue))
                  ,(unless setup-delay-with-threads
                     `(defconst setup--delay-timer-object
-                       (run-with-timer ,setup-delay-interval ,setup-delay-interval
-                                       (lambda ()
-                                         (if setup--delay-queue
-                                             (eval (pop setup--delay-queue))
-                                           (message ">> [init] all delayed setup completed.")
-                                           (cancel-timer setup--delay-timer-object))))))
+                       (when setup--delay-queue
+                         (run-with-timer ,setup-delay-interval ,setup-delay-interval
+                                         (lambda ()
+                                           (if setup--delay-queue
+                                               (eval (pop setup--delay-queue))
+                                             (message ">> [init] all delayed setup completed.")
+                                             (cancel-timer setup--delay-timer-object)))))))
                  ,(when setup-delay-with-threads
-                    '(make-thread
-                      (lambda ()
-                        (while setup--delay-queue
-                          (thread-yield)
-                          (eval (pop setup--delay-queue)))
-                        (message ">> [init] all delayed setup completed."))))
+                    '(when setup--delay-queue
+                       (make-thread
+                        (lambda ()
+                          (while setup--delay-queue
+                            (thread-yield)
+                            (eval (pop setup--delay-queue)))
+                          (message ">> [init] all delayed setup completed.")))))
                  ,(when setup-disable-magic-file-name
                     `(unless file-name-handler-alist
                        (setq file-name-handler-alist ',file-name-handler-alist)))
