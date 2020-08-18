@@ -463,18 +463,20 @@ is invoked, if FILE exists."
 (defmacro !- (&rest body)
   "Eval BODY when Emacs started up with slight delay. This works
 like a pseudo asynchronous process."
-  (let* ((place (cond ((eq (car body) :prepend)
-                       (pop body)
-                       'setup--delay-priority-queue)
-                      (t
-                       'setup--delay-queue)))
-         (form (cond (setup-delay-silent
-                      `(let ((inhibit-message t)) ,@body))
-                     ((cadr body)
-                      `(progn ,@body))
-                     (t
-                      (car body)))))
-    `(push ',(macroexpand-all form) ,place)))
+  (if (not (setup--byte-compiling-p))
+      `(progn ,@body)
+    (let* ((place (cond ((eq (car body) :prepend)
+                         (pop body)
+                         'setup--delay-priority-queue)
+                        (t
+                         'setup--delay-queue)))
+           (form (cond (setup-delay-silent
+                        `(let ((inhibit-message t)) ,@body))
+                       ((cadr body)
+                        `(progn ,@body))
+                       (t
+                        (car body)))))
+      `(push ',(macroexpand-all form) ,place))))
 
 ;; + other utilities
 
