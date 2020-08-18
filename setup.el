@@ -250,12 +250,13 @@ instead of loading it."
          (srcfile (and libfile
                        (or (ignore-errors (find-library-name file))
                            (expand-file-name file)))))
-    (cond ((and srcfile (file-exists-p srcfile))
+    (cond ((not (setup--byte-compiling-p))
+           (macroexpand-all `(setup ,file ,@body)))
+          ((and srcfile (file-exists-p srcfile))
            ;; load during compile
-           (when (setup--byte-compiling-p)
-             (let ((byte-compile-warnings nil))
-               (or (ignore-errors (require feature nil t)) (load libfile t t)))
-             (setup--declare-defuns body))
+           (let ((byte-compile-warnings nil))
+             (or (ignore-errors (require feature nil t)) (load libfile t t)))
+           (setup--declare-defuns body)
            (let ((history (load-history-filename-element file))
                  (source (with-temp-buffer
                            (insert-file-contents srcfile)
