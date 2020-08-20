@@ -223,18 +223,19 @@ startup for performance.")
              (let ((byte-compile-warnings nil))
                (or (ignore-errors (require feature nil t)) (load libfile t t)))
              (setup--declare-defuns body))
-           `(let ((beg-time ,(unless setup-silent '(current-time))))
-              ,(if (featurep feature)
-                   `(unless (featurep ',feature)
-                      (load ,libfile t t))
-                 `(load ,libfile t t))
+           `(let* ((beg-time ,(unless setup-silent '(current-time)))
+                   (loaded ,(if (featurep feature)
+                                `(unless (featurep ',feature)
+                                   (load ,libfile t t))
+                              `(load ,libfile t t))))
               (condition-case err
                   (progn ,@body
                          ,(unless setup-silent
-                            `(message ">> [init] %s: loaded in %d msec" ,file
-                                      (let ((now (current-time)))
-                                        (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
-                                           (/ (- (nth 2 now) (nth 2 beg-time)) 1000))))))
+                            `(when loaded
+                               (message ">> [init] %s: loaded in %d msec" ,file
+                                        (let ((now (current-time)))
+                                          (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
+                                             (/ (- (nth 2 now) (nth 2 beg-time)) 1000)))))))
                 (error (message "XX [init] %s: %s" ,file (error-message-string err))))))
           (t
            (byte-compile-warn "%s not found" file)
