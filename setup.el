@@ -161,8 +161,9 @@ startup for performance.")
                        (when setup--delay-queue
                          (run-with-timer ,setup-delay-interval ,setup-delay-interval
                                          (lambda ()
-                                           (if setup--delay-queue
-                                               (eval (pop setup--delay-queue))
+                                           (when setup--delay-queue
+                                             (eval (pop setup--delay-queue)))
+                                           (unless setup--delay-queue
                                              (message ">> [init] all delayed setup completed.")
                                              (cancel-timer setup--delay-timer-object)))))))
                  ,(when setup-delay-with-threads
