@@ -264,8 +264,10 @@ the body while expanding the body."
           (setup--read-and-macroexpand-all stream))))
 
 (defmacro setup-include (file &rest body)
-  "Like `setup', but includes FILE to the compiled init script
-instead of loading it."
+  "[UNSTABLE] Like `setup', but includes FILE to the compiled
+init script instead of loading it. This may shorten the loading
+time on a few systems. Note that this may break libraries with
+different `lexical-binding' value to the init file."
   (declare (indent 1))
   (let* ((feature (intern file))         ; string->symbol
          (libfile (setup--locate-library file))
