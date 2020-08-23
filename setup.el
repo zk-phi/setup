@@ -252,7 +252,8 @@ instead of loading it."
          (srcfile (and libfile
                        (or (ignore-errors (find-library-name file))
                            (expand-file-name file)))))
-    (cond ((not (setup--byte-compiling-p))
+    (cond ((or (not (setup--byte-compiling-p))
+               (eq setup-include-allow-runtime-load 'always))
            (macroexpand-all `(setup ,file ,@body)))
           ((and srcfile (file-exists-p srcfile))
            ;; load during compile
