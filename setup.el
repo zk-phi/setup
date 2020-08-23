@@ -226,26 +226,43 @@ startup for performance.")
              (let ((byte-compile-warnings nil))
                (or (ignore-errors (require feature nil t)) (load libfile t t)))
              (setup--declare-defuns body))
-           `(let* ((beg-time ,(unless setup-silent '(current-time)))
-                   (loaded ,(if (featurep feature)
-                                `(unless (featurep ',feature)
-                                   (load ,libfile t t))
-                              `(load ,libfile t t))))
-              (condition-case err
-                  (progn ,@body
-                         ,(unless setup-silent
-                            `(when loaded
-                               (message ">> [init] %s: loaded in %d msec" ,file
-                                        (let ((now (current-time)))
-                                          (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
-                                             (/ (- (nth 2 now) (nth 2 beg-time)) 1000)))))))
-                (error (message "XX [init] %s: %s" ,file (error-message-string err))))))
+           (let ((loadform (if (featurep feature)
+                               `(unless (featurep ',feature)
+                                  (load ,libfile t t))
+                             `(load ,libfile t t)))
+                 (bodyform `(condition-case err
+                                (progn ,@body)
+                              (error
+                               (message "XX [init] %s: %s" ,file (error-message-string err))))))
+             (if setup-silent
+                 `(progn
+                    ,loadform
+                    ,bodyform)
+               `(let* ((beg-time (current-time))
+                       (loaded ,loadform))
+                  ,bodyform
+                  (when loaded
+                    (message ">> [init] %s: loaded in %d msec" ,file
+                             (let ((now (current-time)))
+                               (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
+                                  (/ (- (nth 2 now) (nth 2 beg-time)) 1000)))))))))
           (t
            (byte-compile-warn "%s not found" file)
            nil))))
 
-(defun setup--read-all (stream)
-  (ignore-errors (cons (read stream) (setup--read-all stream))))
+(defun setup--read-and-macroexpand-all (stream)
+  "Read and macroexpand all forms from STREAM. When a form has a
+call to `eval-when-compile' or `eval-and-compile' macro, evaluate
+the body while expanding the body."
+  (ignore-errors
+    (cons (macroexpand-all
+           (read stream)
+           `((eval-when-compile
+               . (lambda (&rest body) `',(eval `(progn ,@body))))
+             (eval-and-compile
+               . (lambda (&rest body) (eval `(progn ,@body)) `(progn ,@body)))))
+          (setup--read-and-macroexpand-all stream))))
+
 (defmacro setup-include (file &rest body)
   "Like `setup', but includes FILE to the compiled init script
 instead of loading it."
@@ -263,31 +280,31 @@ instead of loading it."
            (let ((byte-compile-warnings nil))
              (or (ignore-errors (require feature nil t)) (load libfile t t)))
            (setup--declare-defuns body)
-           (let ((history (load-history-filename-element file))
-                 (source (with-temp-buffer
-                           (insert-file-contents srcfile)
-                           (setup--read-all (current-buffer)))))
-             `(let ((beg-time ,(unless setup-silent '(current-time))))
-                (unless (featurep ',feature)
-                  ;; The author of .emacs considered not responsible
-                  ;; for the warnings in included libraries
-                  (with-no-warnings
-                    ,(macroexpand-all
-                      `(progn ,@source)
-                      `((eval-when-compile
-                          . (lambda (&rest body) `',(eval `(progn ,@body))))
-                        (eval-and-compile
-                          . (lambda (&rest body) (eval `(progn ,@body)) `(progn ,@body))))))
-                  (push ',history load-history)
-                  (do-after-load-evaluation ,libfile))
-                (condition-case err
-                    (progn ,@body
-                           ,(unless setup-silent
-                              `(message ">> [init] %s: loaded in %d msec" ,file
-                                        (let ((now (current-time)))
-                                          (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
-                                             (/ (- (nth 2 now) (nth 2 beg-time)) 1000))))))
-                  (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))
+           (let* ((history (load-history-filename-element file))
+                  (source (with-temp-buffer
+                            (insert-file-contents srcfile)
+                            (setup--read-and-macroexpand-all (current-buffer))))
+                  (loadform `(unless (featurep ',feature)
+                               ;; The author of .emacs considered not responsible
+                               ;; for the warnings in included libraries
+                               (with-no-warnings ,@source)
+                               (push ',history load-history)
+                               (do-after-load-evaluation ,libfile)))
+                  (bodyform `(condition-case err
+                                 (progn ,@body)
+                               (error
+                                (message "XX [init] %s: %s" ,file (error-message-string err))))))
+             (if setup-silent
+                 `(progn
+                    ,loadform
+                    ,bodyform)
+               `(let ((beg-time (current-time)))
+                  ,loadform
+                  ,bodyform
+                  (message ">> [init] %s: loaded in %d msec" ,file
+                           (let ((now (current-time)))
+                             (+ (* (- (nth 1 now) (nth 1 beg-time)) 1000)
+                                (/ (- (nth 2 now) (nth 2 beg-time)) 1000))))))))
           ((and libfile
                 (or (and (eq setup-include-allow-runtime-load 'ask)
                          (setq setup-include-allow-runtime-load
