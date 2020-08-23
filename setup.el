@@ -58,9 +58,12 @@
 
 ;; + customizable vars
 
-(defvar setup-include-allow-runtime-load 'undef
-  "When non-nil, allow `setup-include' to load libraries in
-runtime, if the source file is not found.")
+(defvar setup-include-allow-runtime-load 'ask
+  "When t, allow `setup-include' to load libraries in runtime, if
+the source file is not found. When nil, skip loading the
+libraries. Special default value `ask', asks user to allow or not
+on demand. Another special value `always' is mainly for debug
+purpose, and load all libraries in runtime (just like `setup').")
 
 (defvar setup-environ-warning-alist
   '(((system-name)
@@ -286,12 +289,11 @@ instead of loading it."
                                              (/ (- (nth 2 now) (nth 2 beg-time)) 1000))))))
                   (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))
           ((and libfile
-                (or (not (setup--byte-compiling-p))
-                    (if (eq setup-include-allow-runtime-load 'undef)
-                        (setq setup-include-allow-runtime-load
-                              (y-or-n-p (concat "Some libraries are not includable."
-                                                " Load them during runtime ?")))
-                      setup-include-allow-runtime-load)))
+                (or (and (eq setup-include-allow-runtime-load 'ask)
+                         (setq setup-include-allow-runtime-load
+                               (y-or-n-p (concat "Some libraries are not includable."
+                                                 " Load them during runtime ?"))))
+                    setup-include-allow-runtime-load))
            `(setup ,file ,@body))
           (t
            (byte-compile-warn "%s not found" file)
