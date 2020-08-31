@@ -325,33 +325,35 @@ different `lexical-binding' value to the init file."
   "Load FILE and evaluate BODY when a function listed in TRIGGERS
 is invoked, if FILE exists."
   (declare (indent defun))
-  (cond ((setup--locate-library file)
-         (let ((triggers (eval triggers))
-               (preparation (when (and body (eq (car body) :prepare))
-                              (prog1 (cadr body) (setq body (cddr body))))))
-           ;; load during compile
-           (when (setup--byte-compiling-p)
-             (eval preparation)
-             (let ((byte-compile-warnings nil))
-               (or (ignore-errors (require (intern file) nil t)) (load file t t)))
-             (setup--declare-defuns body))
-           `(progn
-              ,@(mapcar (lambda (trigger)
-                          `(autoload ',trigger ,file nil t))
-                        triggers)
-              ,(when preparation
-                 `(condition-case err
-                      ,preparation
-                    (error (message "XX [init] %s: %s" ,file (error-message-string err)))))
-              (eval-after-load ,file
-                ',(macroexpand-all
-                   `(condition-case err
-                        (progn ,@body
-                               ,(unless setup-silent `(message "<< [init] %s: loaded" ,file)))
-                      (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))))
-        (t
-         (byte-compile-warn "%s not found" file)
-         nil)))
+  (let ((feature (intern file))
+        (libfile (setup--locate-library file)))
+   (cond (libfile
+          (let ((triggers (eval triggers))
+                (preparation (when (and body (eq (car body) :prepare))
+                               (prog1 (cadr body) (setq body (cddr body))))))
+            ;; load during compile
+            (when (setup--byte-compiling-p)
+              (eval preparation)
+              (let ((byte-compile-warnings nil))
+                (or (ignore-errors (require feature nil t)) (load libfile t t)))
+              (setup--declare-defuns body))
+            `(progn
+               ,@(mapcar (lambda (trigger)
+                           `(autoload ',trigger ,libfile nil t))
+                         triggers)
+               ,(when preparation
+                  `(condition-case err
+                       ,preparation
+                     (error (message "XX [init] %s: %s" ,file (error-message-string err)))))
+               (eval-after-load ,file
+                 ',(macroexpand-all
+                    `(condition-case err
+                         (progn ,@body
+                                ,(unless setup-silent `(message "<< [init] %s: loaded" ,file)))
+                       (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))))
+         (t
+          (byte-compile-warn "%s not found" file)
+          nil))))
 
 ;; + pre/post-load evaluation
 
