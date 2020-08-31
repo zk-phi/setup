@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t -*-
 ;;; setup.el --- helper macros to write faster, portable and robust init script
 
 ;; Copyright (C) 2013-2015 zk_phi
