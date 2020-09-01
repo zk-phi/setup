@@ -113,7 +113,7 @@ startup for performance.")
 
 ;; + font-lock keywords for elisp mode
 
-(eval-after-load "lisp-mode"
+(eval-after-load 'lisp-mode
   '(font-lock-add-keywords
     'emacs-lisp-mode
     '(("(\\(setup\\(?:-\\(?:in\\(?:clude\\|-idle\\)\\|after\\|expecting\\|lazy\\)\\)?\\)\\_>"
@@ -345,7 +345,7 @@ is invoked, if FILE exists."
                   `(condition-case err
                        ,preparation
                      (error (message "XX [init] %s: %s" ,file (error-message-string err)))))
-               (eval-after-load ,file
+               (eval-after-load ',(if (featurep feature) feature file)
                  ',(macroexpand-all
                     `(condition-case err
                          (progn ,@body
@@ -368,7 +368,7 @@ is invoked, if FILE exists."
         (let ((byte-compile-warnings nil))
           (or (ignore-errors (require feature nil t)) (load libfile t t)))
         (setup--declare-defuns body))
-      `(eval-after-load ,file
+      `(eval-after-load ',(if (featurep feature) feature file)
          ',(macroexpand-all
             `(condition-case err ,(if (cadr body) `(progn ,@body) (car body))
                (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))))
