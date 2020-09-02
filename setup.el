@@ -552,7 +552,8 @@ add it without wrapping with `lambda'. HOOK must be already
 declared."
   (declare (indent 1))
   `(let ((oldvalue (when (default-boundp ,hook) (default-value ,hook))))
-     (if (or (not (listp oldvalue)) (eq (car oldvalue) 'lambda))
+     (if (and oldvalue
+              (or (not (consp oldvalue)) (eq (car oldvalue) 'lambda)))
          (set-default ,hook (list ,(if (eq (caar exprs) 'quote)
                                        (car exprs)
                                      `(lambda () ,@exprs))
