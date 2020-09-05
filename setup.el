@@ -123,20 +123,6 @@ startup for performance.")
 
 ;; + initialize
 
-(defmacro setup-with-delayed-redisplay (&rest body)
-  `(let ((original-redisplay-fn (symbol-function 'redisplay)))
-     ;; why is "flet" obsolete ?
-     (unwind-protect
-         (progn
-           (fset 'redisplay (lambda (&rest _) nil))
-           ,@body)
-       (fset 'redisplay original-redisplay-fn))))
-
-(defmacro setup-silently (&rest body)
-  "Eval body without messages"
-  `(let ((inhibit-message t))
-     ,@body))
-
 (defmacro setup-initialize ()
   "This macro is replaced with an initializing routine when expanded.
 *PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT.*"
@@ -414,7 +400,7 @@ is invoked, if FILE exists."
                                       (load ,libfile t t))
                                  `(load ,libfile t t)))))))
 
-;; + compile-time execution / delayed execution
+;; + compile-time execution
 
 (defun setup--make-anaphoric-env (value)
   "Internal function for anaphoric macros."
@@ -562,6 +548,20 @@ declared."
                                      (car exprs)
                                    `(lambda () ,@exprs))
                                 oldvalue)))))
+
+(defmacro setup-with-delayed-redisplay (&rest body)
+  `(let ((original-redisplay-fn (symbol-function 'redisplay)))
+     ;; why is "flet" obsolete ?
+     (unwind-protect
+         (progn
+           (fset 'redisplay (lambda (&rest _) nil))
+           ,@body)
+       (fset 'redisplay original-redisplay-fn))))
+
+(defmacro setup-silently (&rest body)
+  "Eval body without messages"
+  `(let ((inhibit-message t))
+     ,@body))
 
 (defun setup-byte-compile-file (&optional file cmd)
   "Byte-compile FILE in a clean environment (emacs -q)."
