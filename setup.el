@@ -55,6 +55,8 @@
 (require 'macroexp)     ; macroexpand-all
 (require 'bytecomp)     ; byte-compile-current-file, byte-compile-warn
 
+(require 'setup-checkenv)
+
 (defconst setup-version "1.0.6")
 
 ;; + customizable vars
@@ -65,20 +67,6 @@ the source file is not found. When nil, skip loading the
 libraries. Special default value `ask', asks user to allow or not
 on demand. Another special value `always' is mainly for debug
 purpose, and load all libraries in runtime (just like `setup').")
-
-(defvar setup-environ-warning-alist
-  '(((system-name)
-     . "Init script is not compiled with this system.")
-    (window-system
-     . "Init script is not compiled with this window system.")
-    (user-login-name
-     . "Init script is not compiled by this user.")
-    (emacs-version
-     . "Init script is not compiled with this version of Emacs."))
-  "Alist of expressions Vs messages. Each expressions are
-evaluated everytime on startup, and when some of them evaluates
-to a different value from the value evaluated during compile,
-warning message are shown.")
 
 (defvar setup-delay-interval 0.1
   "Delay for delayed setup `!-'.")
@@ -132,13 +120,7 @@ startup for performance.")
      (defconst setup--start-time (current-time))
      (defvar setup--delay-queue nil)
      (defvar setup--delay-priority-queue nil)
-     ;; check and warn about environ
-     (unless (and ,@(mapcar (lambda (pair)
-                              `(or (equal ',(eval (car pair)) ,(car pair))
-                                   (y-or-n-p
-                                    ,(concat (cdr pair) " Really continue ? "))))
-                            setup-environ-warning-alist))
-       (error "Setup canceled."))
+     (setup--checkenv)
      ;; setup profiler
      ,@(when setup-use-profiler
          '((require 'profiler)
