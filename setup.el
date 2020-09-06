@@ -105,13 +105,13 @@ loading libraries.")
      (setup-hacks--magic-file-name-initialize)
      (setup-profiler--initialize)
      (setup-delay--initialize)
-     (add-hook 'after-init-hook
-               (lambda  ()
-                 (setup-delay--after-init)
-                 (setup-hacks--magic-file-name-after-init)
-                 (setup-hacks--gc-threshold-after-init)
-                 (setup-profiler--after-init)
-                 (setup-time--after-init)))))
+     (push (lambda  ()
+             (setup-delay--after-init)
+             (setup-hacks--magic-file-name-after-init)
+             (setup-hacks--gc-threshold-after-init)
+             (setup-profiler--after-init)
+             (setup-time--after-init))
+           after-init-hook)))
 
 ;; + load and configure libraries
 
