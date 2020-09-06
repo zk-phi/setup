@@ -12,8 +12,11 @@ startup for performance.")
 
 (defmacro setup-hacks--gc-threshold-after-init ()
   (when setup-enable-gc-threshold-hacks
-    '(setq gc-cons-threshold  16777216 ; 16mb
-           gc-cons-percentage 0.1)))
+    '(run-with-idle-timer
+      0.5 nil
+      (lambda ()
+        (setq gc-cons-threshold  16777216 ; 16mb
+              gc-cons-percentage 0.1)))))
 
 (defmacro setup-hacks--magic-file-name-initialize ()
   (when setup-disable-magic-file-name
