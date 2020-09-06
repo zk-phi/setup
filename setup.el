@@ -62,6 +62,7 @@
 (require 'setup-tools)
 (require 'setup-utils)
 (require 'setup-checkenv)
+(require 'setup-hacks)
 
 (defconst setup-version "1.0.6")
 
@@ -77,13 +78,6 @@ purpose, and load all libraries in runtime (just like `setup').")
 (defvar setup-silent nil
   "When non-nil, setup and setup-include does not message after
 loading libraries.")
-
-(defvar setup-disable-magic-file-name nil
-  "When non-nil, file-name-handler-alist is set nil during
-startup for performance.")
-
-(defvar setup-enable-gc-threshold-hacks nil
-  "When non-nil, enlarge gc-threshold during startup.")
 
 (defvar setup-idle-threshold 13
   "Idle time threshold in seconds to invoke `setup-in-idle'.")
@@ -109,22 +103,15 @@ startup for performance.")
      (setup-time--initialize)
      (setup-delay--initialize)
      (setup-profiler--initialize)
+     (setup-hacks--magic-file-name-initialize)
+     (setup-hacks--gc-threshold-initialize)
      (add-hook 'after-init-hook
                (lambda  ()
+                 (setup-hacks--magic-file-name-after-init)
+                 (setup-hacks--gc-threshold-after-init)
                  (setup-delay--after-init)
-                 ,(when setup-disable-magic-file-name
-                    `(unless file-name-handler-alist
-                       (setq file-name-handler-alist ',file-name-handler-alist)))
-                 ,(when setup-enable-gc-threshold-hacks
-                    '(setq gc-cons-threshold  16777216 ; 16mb
-                           gc-cons-percentage 0.1))
                  (setup-profiler--after-init)
                  (setup-time--after-init)))))
-     ,(when setup-enable-gc-threshold-hacks
-        '(setq gc-cons-threshold  most-positive-fixnum
-               gc-cons-percentage 0.6))
-     ,(when setup-disable-magic-file-name
-        '(setq file-name-handler-alist nil))))
 
 ;; + load and configure libraries
 
