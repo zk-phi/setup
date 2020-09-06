@@ -57,6 +57,7 @@
 
 (require 'setup-delay)
 (require 'setup-profiler)
+(require 'setup-time)
 (require 'setup-utils)
 (require 'setup-checkenv)
 
@@ -102,8 +103,8 @@ startup for performance.")
 *PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT.*"
   `(progn
      (defconst setup-last-compiled-time ,(format-time-string "%D %T"))
-     (defconst setup--start-time (current-time))
      (setup--checkenv)
+     (setup-time--initialize)
      (setup-delay--initialize)
      (setup-profiler--initialize)
      (add-hook 'after-init-hook
@@ -116,10 +117,7 @@ startup for performance.")
                     '(setq gc-cons-threshold  16777216 ; 16mb
                            gc-cons-percentage 0.1))
                  (setup-profiler--after-init)
-                 (message ">> [init] TOTAL: %d msec"
-                          (let ((now (current-time)))
-                            (+ (* (- (nth 1 now) (nth 1 setup--start-time)) 1000)
-                               (/ (- (nth 2 now) (nth 2 setup--start-time)) 1000))))))
+                 (setup-time--after-init)))))
      ,(when setup-enable-gc-threshold-hacks
         '(setq gc-cons-threshold  most-positive-fixnum
                gc-cons-percentage 0.6))
