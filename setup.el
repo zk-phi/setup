@@ -56,6 +56,7 @@
 (require 'bytecomp)     ; byte-compile-current-file, byte-compile-warn
 
 (require 'setup-profiler)
+(require 'setup-utils)
 (require 'setup-checkenv)
 
 (defconst setup-version "1.0.6")
@@ -159,11 +160,6 @@ startup for performance.")
         '(setq file-name-handler-alist nil))))
 
 ;; + load and configure libraries
-
-(defvar setup--simulated-absent-libraries nil)
-(defun setup--locate-library (file)
-  (and (not (member file setup--simulated-absent-libraries))
-       (locate-library file)))
 
 (defun setup--byte-compiling-p ()
   "Return non-nil iff byte-compile is in progress."
@@ -584,12 +580,6 @@ declared."
           (goto-char (point-max)))
         (unless (zerop returncode)
           (display-buffer "*Compile-Log*"))))))
-
-;; + debugging utils
-
-(defmacro setup-simulate-absense (file)
-  (push file setup--simulated-absent-libraries)
-  nil)
 
 ;; + (provide)
 
