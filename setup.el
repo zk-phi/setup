@@ -55,6 +55,7 @@
 (require 'macroexp)     ; macroexpand-all
 (require 'bytecomp)     ; byte-compile-current-file, byte-compile-warn
 
+(require 'setup-profiler)
 (require 'setup-checkenv)
 
 (defconst setup-version "1.0.6")
@@ -85,9 +86,6 @@ loading libraries.")
 
 (defvar setup-delay-silent nil
   "When non-nil, delayed setup does not message.")
-
-(defvar setup-use-profiler nil
-  "When non-nil, profile setup time and report after init.")
 
 (defvar setup-disable-magic-file-name nil
   "When non-nil, file-name-handler-alist is set nil during
@@ -121,10 +119,7 @@ startup for performance.")
      (defvar setup--delay-queue nil)
      (defvar setup--delay-priority-queue nil)
      (setup--checkenv)
-     ;; setup profiler
-     ,@(when setup-use-profiler
-         '((require 'profiler)
-           (profiler-start 'cpu)))
+     (setup-profiler--initialize)
      (add-hook 'after-init-hook
                (lambda  ()
                  (setq setup--delay-queue (nconc setup--delay-priority-queue setup--delay-queue))
@@ -152,9 +147,7 @@ startup for performance.")
                  ,(when setup-enable-gc-threshold-hacks
                     '(setq gc-cons-threshold  16777216 ; 16mb
                            gc-cons-percentage 0.1))
-                 ,@(when setup-use-profiler
-                     '((profiler-report)
-                       (profiler-stop)))
+                 (setup-profiler--after-init)
                  (message ">> [init] TOTAL: %d msec"
                           (let ((now (current-time)))
                             (+ (* (- (nth 1 now) (nth 1 setup--start-time)) 1000)
