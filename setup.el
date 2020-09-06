@@ -55,6 +55,7 @@
 (require 'macroexp)     ; macroexpand-all
 (require 'bytecomp)     ; byte-compile-current-file, byte-compile-warn
 
+(require 'setup-delay)
 (require 'setup-profiler)
 (require 'setup-utils)
 (require 'setup-checkenv)
@@ -70,23 +71,9 @@ libraries. Special default value `ask', asks user to allow or not
 on demand. Another special value `always' is mainly for debug
 purpose, and load all libraries in runtime (just like `setup').")
 
-(defvar setup-delay-interval 0.1
-  "Delay for delayed setup `!-'.")
-
-(defvar setup-delay-with-threads nil
-  "When non-nil, delayed setup is evaluated with threads, instead
-of run-with-idle-timer. This may break setup process if it's not
-thread-safe.
-
-This is an experimental feature and interface may change in
-future versions.")
-
 (defvar setup-silent nil
   "When non-nil, setup and setup-include does not message after
 loading libraries.")
-
-(defvar setup-delay-silent nil
-  "When non-nil, delayed setup does not message.")
 
 (defvar setup-disable-magic-file-name nil
   "When non-nil, file-name-handler-alist is set nil during
@@ -115,33 +102,13 @@ startup for performance.")
 *PUT THIS MACRO AT THE VERY BEGINNING OF YOUR INIT SCRIPT.*"
   `(progn
      (defconst setup-last-compiled-time ,(format-time-string "%D %T"))
-     ;; setup stopwatch
      (defconst setup--start-time (current-time))
-     (defvar setup--delay-queue nil)
-     (defvar setup--delay-priority-queue nil)
      (setup--checkenv)
+     (setup-delay--initialize)
      (setup-profiler--initialize)
      (add-hook 'after-init-hook
                (lambda  ()
-                 (setq setup--delay-queue (nconc setup--delay-priority-queue setup--delay-queue))
-                 ,(unless setup-delay-with-threads
-                    `(defconst setup--delay-timer-object
-                       (when setup--delay-queue
-                         (run-with-timer ,setup-delay-interval ,setup-delay-interval
-                                         (lambda ()
-                                           (when setup--delay-queue
-                                             (eval (pop setup--delay-queue)))
-                                           (unless setup--delay-queue
-                                             (message ">> [init] all delayed setup completed.")
-                                             (cancel-timer setup--delay-timer-object)))))))
-                 ,(when setup-delay-with-threads
-                    '(when setup--delay-queue
-                       (make-thread
-                        (lambda ()
-                          (while setup--delay-queue
-                            (thread-yield)
-                            (eval (pop setup--delay-queue)))
-                          (message ">> [init] all delayed setup completed.")))))
+                 (setup-delay--after-init)
                  ,(when setup-disable-magic-file-name
                     `(unless file-name-handler-alist
                        (setq file-name-handler-alist ',file-name-handler-alist)))
@@ -444,24 +411,6 @@ is invoked, if FILE exists."
                 (if (cadr body) `(progn ,@body) (car body))
                 (setup--make-anaphoric-env elem)))
              (eval list))))
-
-(defmacro !- (&rest body)
-  "Eval BODY when Emacs started up with slight delay. This works
-like a pseudo asynchronous process."
-  (if (not (setup--byte-compiling-p))
-      `(progn ,@body)
-    (let* ((place (cond ((eq (car body) :prepend)
-                         (pop body)
-                         'setup--delay-priority-queue)
-                        (t
-                         'setup--delay-queue)))
-           (form (cond (setup-delay-silent
-                        `(let ((inhibit-message t)) ,@body))
-                       ((cadr body)
-                        `(progn ,@body))
-                       (t
-                        (car body)))))
-      `(push ',(macroexpand-all form) ,place))))
 
 ;; + other utilities
 
