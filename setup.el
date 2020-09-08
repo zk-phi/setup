@@ -242,6 +242,8 @@ is invoked, if FILE exists."
           (let ((triggers (eval triggers))
                 (preparation (when (and body (eq (car body) :prepare))
                                (prog1 (cadr body) (setq body (cddr body))))))
+            (unless setup-silent
+              (setq body (nconc body `((message "<< [init] %s: loaded" ,file)))))
             ;; load during compile
             (when (setup--byte-compiling-p)
               (eval preparation)
@@ -256,12 +258,12 @@ is invoked, if FILE exists."
                   `(condition-case err
                        ,preparation
                      (error (message "XX [init] %s: %s" ,file (error-message-string err)))))
-               (eval-after-load ',(if (featurep feature) feature file)
-                 ',(macroexpand-all
-                    `(condition-case err
-                         (progn ,@body
-                                ,(unless setup-silent `(message "<< [init] %s: loaded" ,file)))
-                       (error (message "XX [init] %s: %s" ,file (error-message-string err)))))))))
+               ,(when body
+                  `(eval-after-load ',(if (featurep feature) feature file)
+                     ',(macroexpand-all
+                        `(condition-case err
+                             (progn ,@body)
+                           (error (message "XX [init] %s: %s" ,file (error-message-string err))))))))))
          (t
           (byte-compile-warn "%s not found" file)
           nil))))
