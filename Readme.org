@@ -315,6 +315,14 @@ Like =add-hook= but
     (setq eshell-last-command-status 0))
 #+end_src
 
+- =:oneshot= hooks, which runs only once, are also supported
+
+#+begin_src emacs-lisp
+  (setup-hook 'eshell-mode-hook
+    :oneshot
+    (local-set-key ...))
+#+end_src
+
 *** =setup-with-delayed-redisplay=
 
 Avoid redisplaying the screen while executing body for performance:
