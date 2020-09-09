@@ -39,21 +39,25 @@ or ELSECOMMAND otherwise."
      kmap))
 
 (defmacro setup-hook (hook &rest exprs)
-  "Add (lambda () ,@exprs) to HOOK. If EXPRS is just a symbol,
-add it without wrapping with `lambda'. HOOK must be already
-declared."
+  "Add (lambda () ,@exprs) to HOOK. If the first expression of
+EXPRS is :oneshot, then the hook will be removed once called. If
+EXPRS is just a symbol, add it without wrapping with
+`lambda'. HOOK must be already declared."
   (declare (indent 1))
-  `(let ((oldvalue (when (default-boundp ,hook) (default-value ,hook))))
-     (if (and oldvalue
-              (or (not (consp oldvalue)) (eq (car oldvalue) 'lambda)))
-         (set-default ,hook (list ,(if (eq (caar exprs) 'quote)
-                                       (car exprs)
-                                     `(lambda () ,@exprs))
-                                  oldvalue))
-       (set-default ,hook (cons ,(if (eq (caar exprs) 'quote)
-                                     (car exprs)
-                                   `(lambda () ,@exprs))
-                                oldvalue)))))
+  (let* ((oneshotp (eq (car exprs) :oneshot))
+         (sym (and oneshotp (gensym "setup-")))
+         (fn (cond (oneshotp
+                    `(lambda () ,@(cdr exprs) (remove-hook ,hook ,sym)))
+                   ((eq (caar exprs) 'quote)
+                    (car exprs))
+                   (t
+                    `(lambda () ,@exprs)))))
+    `(let ((oldvalue (when (default-boundp ,hook) (default-value ,hook))))
+       ,(when oneshotp `(defvar ,sym ,fn))
+       (if (and oldvalue
+                (or (not (consp oldvalue)) (eq (car oldvalue) 'lambda)))
+           (set-default ,hook (list ,fn oldvalue))
+         (set-default ,hook (cons ,fn oldvalue))))))
 
 (defmacro setup-with-delayed-redisplay (&rest body)
   `(let ((original-redisplay-fn (symbol-function 'redisplay)))
