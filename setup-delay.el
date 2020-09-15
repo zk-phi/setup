@@ -1,3 +1,5 @@
+(require 'setup-utils)
+
 (defvar setup-delay-interval 0.1
   "Delay for delayed setup `!-'.")
 

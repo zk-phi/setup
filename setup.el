@@ -115,11 +115,6 @@ loading libraries.")
 
 ;; + load and configure libraries
 
-(defun setup--byte-compiling-p ()
-  "Return non-nil iff byte-compile is in progress."
-  (and (boundp 'byte-compile-current-file)
-       byte-compile-current-file))
-
 (defun setup--declare-defuns (body)
   "Declare symbols defun-ed in the forms BODY, to avoid
 `undefined function` warnings."
