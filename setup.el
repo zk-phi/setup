@@ -63,6 +63,7 @@
 (require 'setup-utils)
 (require 'setup-checkenv)
 (require 'setup-hacks)
+(require 'setup-tracker)
 
 (defconst setup-version "1.0.6")
 
@@ -105,7 +106,9 @@ loading libraries.")
      (setup-profiler--initialize)
      (setup-time--initialize)
      (setup-delay--initialize)
+     (setup-tracker--initialize)
      (push (lambda  ()
+             (setup-tracker--after-init)
              (setup-delay--after-init)
              (setup-time--after-init)
              (setup-profiler--after-init)

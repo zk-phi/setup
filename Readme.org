@@ -255,7 +255,7 @@ temporarilly disables the feature for you, if
     (setq setup-disable-magic-file-name t))
 #+end_src
 
-** Other utils
+** Other LISP utils
 *** Pseudo-async execution
 
 You may wrap some forms with =!-= so that it runs
@@ -341,13 +341,27 @@ Suppress message while executing body for performance:
     (key-chord-mode 1))   ; the message "Key Chord mode on" is suppressed
 #+end_src
 
-*** Profiler support
+** Helper tools to speed-up your =init.el=
+*** Profiler integration
 
-You may enable profiler to profile your =init.el=, by setting =setup-use-profler=.
+You may enable profiler to find time-consuming functions in your
+=init.el=.
 
 #+begin_src emacs-lisp
   (eval-when-compile
     (setq setup-use-profiler t))
+#+end_src
+
+=setup.el= shows the result after the setup process is completed.
+
+*** Load-history tracker
+
+You may enable load-history tracker to inspect how and when packages
+are loaded.
+
+#+begin_src emacs-lisp
+  (eval-when-compile
+    (setq setup-use-load-history-tracker t))
 #+end_src
 
 =setup.el= shows the result after the setup process is completed.
