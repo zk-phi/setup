@@ -48,6 +48,7 @@
 ;; 1.0.4 Fix minor bugs
 ;; 1.0.5 add option setup-silent and macro setup-silently
 ;; 1.0.6 add macro setup-fallback, setup-with-delayed-redisplay and setup-simulate-absense
+;; 1.1.0 add load-history tracker feature
 
 ;;; Code:
 
@@ -65,7 +66,7 @@
 (require 'setup-hacks)
 (require 'setup-tracker)
 
-(defconst setup-version "1.0.6")
+(defconst setup-version "1.1.0")
 
 ;; + customizable vars
 
