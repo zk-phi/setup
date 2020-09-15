@@ -2,9 +2,7 @@
   "Internal function for anaphoric macros."
   `((,'\, . (lambda (&rest body) `',(funcall `(lambda (it) ,@body) ',value)))))
 
-(defmacro ! (sexp)
-  "Eval SEXP during compile."
-  `',(eval sexp))
+(defalias '! 'eval-when-compile)
 
 (defmacro !if (test then &rest else)
   "Like `if' but anaphoric (TEST value can be referred with
