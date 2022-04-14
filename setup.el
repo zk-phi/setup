@@ -132,8 +132,13 @@ loading libraries.")
   (let ((feature (intern file))
         (libfile (setup--locate-library file)))
     (cond (libfile
-           ;; load during compile to avoid warnings
            (when (setup--byte-compiling-p)
+             ;; warn if not byte-compiled yet
+             (when (string-match "\\.el$" libfile)
+               (byte-compile-warn
+                "%s should be byte-compiled for better performance."
+                (file-name-nondirectory libfile)))
+             ;; load during compile to avoid warnings
              (let ((byte-compile-warnings nil))
                (or (ignore-errors (require feature nil t)) (load libfile t t)))
              (setup--declare-defuns body))
@@ -243,8 +248,13 @@ is invoked, if FILE exists."
                                (prog1 (cadr body) (setq body (cddr body))))))
             (unless setup-silent
               (setq body (nconc body `((message "<< [init] %s: loaded" ,file)))))
-            ;; load during compile
             (when (setup--byte-compiling-p)
+              ;; warn if not byte-compiled yet
+              (when (string-match "\\.el$" libfile)
+                (byte-compile-warn
+                 "%s should be byte-compiled for better performance."
+                 (file-name-nondirectory libfile)))
+              ;; load during compile
               (eval preparation)
               (let ((byte-compile-warnings nil))
                 (or (ignore-errors (require feature nil t)) (load libfile t t)))
